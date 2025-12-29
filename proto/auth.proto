@@ -2,15 +2,55 @@ syntax = "proto3";
 
 package auth;
 
+import "google/api/annotations.proto";
+
 // Указываем пакет для Go-кода
 option go_package = "go-auth/gen/auth";
 
 service Auth {
-  rpc Register(RegisterRequest) returns (RegisterResponse);
-  rpc Login(LoginRequest) returns (LoginResponse);
-  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
-  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
-  rpc Logout(LogoutRequest) returns (LogoutResponse);
+  rpc Register(RegisterRequest) returns (RegisterResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/register"
+      body: "*"
+    };
+  }
+  
+  rpc Login(LoginRequest) returns (LoginResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/login"
+      body: "*"
+    };
+  }
+  
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/refresh"
+      body: "*"
+    };
+  }
+  
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/validate"
+      body: "*"
+    };
+  }
+  
+  // Повторная отправка кода верификации email
+  rpc ResendVerificationEmail(ResendVerificationEmailRequest) returns (ResendVerificationEmailResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/sign-up/resend-email"
+      body: "*"
+    };
+  }
+  
+  // Верификация email по коду
+  rpc VerifyEmail(VerifyEmailRequest) returns (VerifyEmailResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/sign-up/verify-email"
+      body: "*"
+    };
+  }
 }
 
 message RegisterRequest {
@@ -48,8 +88,26 @@ message ValidateTokenResponse {
   bool valid = 1;
 }
 
-message LogoutRequest {
-  string access_token = 1;
+// Запрос на повторную отправку кода верификации
+message ResendVerificationEmailRequest {
+  string email = 1;
+  string request_id = 2; // Уникальный идентификатор запроса для отслеживания
 }
 
-message LogoutResponse {}
+message ResendVerificationEmailResponse {
+  string message = 1;
+  string request_id = 2; // Возвращаем тот же request_id
+}
+
+// Запрос на верификацию email
+message VerifyEmailRequest {
+  string email = 1;
+  string code = 2;
+  string request_id = 3; // Уникальный идентификатор запроса для отслеживания
+}
+
+message VerifyEmailResponse {
+  bool success = 1;
+  string message = 2;
+  string request_id = 3; // Возвращаем тот же request_id
+}

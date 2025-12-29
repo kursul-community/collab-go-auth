@@ -4,35 +4,49 @@ package app
 import (
 	"context"
 	"fmt"
+	"log"
+	"net"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/peer"
+
 	"go-auth/config"
 	"go-auth/gen/auth"
 	"go-auth/internal/adapter/database"
+	redisadapter "go-auth/internal/adapter/redis"
 	"go-auth/internal/adapter/token"
-	"go-auth/internal/controller/grpc/auth"
-	"go-auth/internal/repo/blacklist"
+	grpcauth "go-auth/internal/controller/grpc/auth"
+	tokenrepo "go-auth/internal/repo/token"
 	"go-auth/internal/repo/user"
-	"go-auth/internal/usecase/auth"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/peer"
-	"log"
-	"net"
+	usecase "go-auth/internal/usecase/auth"
 )
 
 // Run - запускает приложение
 func Run(cfg *config.Config, devMode bool) {
 	// Инициализация дефолтного логгера
 	logger := log.Default()
-	// Подключение к базе данных
-	dbpool, err := database.New(context.Background(), *cfg)
+
+	ctx := context.Background()
+
+	// Подключение к базе данных PostgreSQL
+	dbpool, err := database.New(ctx, *cfg)
 	if err != nil {
-		logger.Fatalf("Unable to create connection pool: %v", err)
+		logger.Fatalf("Unable to create PostgreSQL connection pool: %v", err)
 	}
 	defer dbpool.Close()
-	logger.Printf("Database connection established")
+	logger.Printf("PostgreSQL connection established")
+
+	// Подключение к Redis
+	redisClient, err := redisadapter.New(ctx, cfg.Redis)
+	if err != nil {
+		logger.Fatalf("Unable to connect to Redis: %v", err)
+	}
+	defer redisClient.Close()
+	logger.Printf("Redis connection established")
 
 	// Создаем репозитории
 	userRepo := user.NewRepository(dbpool)
-	blacklistRepo := blacklist.NewRepository(dbpool)
+	tokenRepo := tokenrepo.NewRepository(redisClient)
 
 	// Создаем сервис работы с токенами
 	tokenSvc, err := token.New(cfg.Token.Secret, cfg.Token.AccessTTL, cfg.Token.RefreshTTL)
@@ -40,8 +54,14 @@ func Run(cfg *config.Config, devMode bool) {
 		logger.Fatalf("Failed to initialize token service: %v", err)
 	}
 
-	// Создаем слой usecase
-	authUseCase := usecase.NewAuthUseCase(userRepo, blacklistRepo, tokenSvc)
+	// Создаем слой usecase с TTL параметрами
+	authUseCase := usecase.NewAuthUseCase(
+		userRepo,
+		tokenRepo,
+		tokenSvc,
+		cfg.Token.AccessTTL,
+		cfg.Token.RefreshTTL,
+	)
 
 	// Создаем gRPC-сервер
 	grpcServer := grpc.NewServer(
@@ -60,9 +80,17 @@ func Run(cfg *config.Config, devMode bool) {
 	}
 
 	logger.Printf("Starting gRPC server on port %d\n", cfg.GRPC.Port)
-	// Запускаем gRPC-сервер
-	if err := grpcServer.Serve(lis); err != nil {
-		logger.Fatalf("Failed to serve gRPC server: %v", err)
+	
+	// Запускаем gRPC-сервер в горутине
+	go func() {
+		if err := grpcServer.Serve(lis); err != nil {
+			logger.Fatalf("Failed to serve gRPC server: %v", err)
+		}
+	}()
+
+	// Запускаем HTTP Gateway для REST API
+	if err := RunGateway(cfg); err != nil {
+		logger.Fatalf("Failed to serve HTTP Gateway: %v", err)
 	}
 }
 
@@ -81,11 +109,6 @@ func grpcLogUnaryInterceptor(
 ) (interface{}, error) {
 	logger := log.Default()
 	peerInfo, _ := peer.FromContext(ctx)
-	//if !ok {
-	//	logger.Printf("gRPC Unary called: %s from UNKNOWN", info.FullMethod)
-	//} else {
-	//	//logger.Printf("gRPC Unary called: %s from %s", info.FullMethod, peerInfo.Addr.String())
-	//}
 
 	resp, err := handler(ctx, req)
 

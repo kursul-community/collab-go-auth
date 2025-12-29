@@ -8,9 +8,10 @@
 
 - **Go** — основной язык разработки.
 - **gRPC** — механизм для создания RPC-сервисов.
-- **PostgreSQL** — реляционная база данных для хранения данных.
+- **gRPC-Gateway** — REST API Gateway для фронтенда (транслирует REST в gRPC).
+- **PostgreSQL** — реляционная база данных для хранения данных пользователей.
+- **Redis** — для хранения токенов и сессий пользователей.
 - **JWT** — JSON Web Token для аутентификации пользователей.
-- **Redis*** — для хранения сессий пользователей (реализация будет позже).
 
 ## Структура проекта
 
@@ -40,7 +41,49 @@
 - **pkg** — вспомогательные пакеты
 - **migrations** — миграции базы данных.
 
-**Для взаимодействия с redis описание в разработке*
+## Хранение токенов в Redis
+
+### Где хранятся токены
+
+| Тип данных | Ключ в Redis | TTL | Описание |
+|------------|--------------|-----|----------|
+| **Access токены** | `access_token:<token>` | 30 мин | Активные access токены с привязкой к userID |
+| **Refresh токены** | `refresh_token:<token>` | 30 дней | Активные refresh токены с привязкой к userID |
+| **Access токены пользователя** | `user_access:<userID>` | 30 мин | Set со всеми access токенами пользователя |
+| **Refresh сессии пользователя** | `user_sessions:<userID>` | 30 дней | Set со всеми refresh токенами пользователя |
+
+### Как это работает
+
+1. **При Login**:
+   - Генерируются access и refresh токены (JWT)
+   - **Access токен сохраняется в Redis** с TTL = 30 минут
+   - **Refresh токен сохраняется в Redis** с TTL = 30 дней
+   - Оба токена добавляются в соответствующие списки пользователя
+
+2. **При RefreshToken**:
+   - Проверяется валидность JWT (подпись, срок действия)
+   - Проверяется наличие refresh токена в Redis (не был отозван)
+   - Генерируется новый access токен
+   - **Новый access токен сохраняется в Redis**
+
+3. **При ValidateToken**:
+   - Проверяется валидность JWT (подпись, срок действия)
+   - **Проверяется наличие access токена в Redis** (не был отозван)
+
+4. **При Logout**:
+   - **Access токен удаляется из Redis** (мгновенная инвалидация)
+
+5. **При LogoutAll**:
+   - Удаляются **все access и refresh токены** пользователя
+   - Очищаются списки сессий
+
+### Преимущества хранения всех токенов в Redis
+
+- **Полный контроль**: Можно отозвать любой токен в любой момент
+- **Мгновенная инвалидация**: При logout токен сразу становится недействительным
+- **Управление сессиями**: Возможность выйти на всех устройствах (LogoutAll)
+- **TTL**: Автоматическая очистка истекших записей
+- **Скорость**: O(1) для всех операций с токенами
 
 ## Установка
 
@@ -88,12 +131,18 @@ MIGRATIONS_PATH=/custom/migrations
 
 TOKEN_SECRET=SUPER_SECRET
 
-# PostgreSQL тестовая конфигурация
+# PostgreSQL конфигурация
 PG_USER=admin
 PG_PASSWORD=supersecurepassword
 PG_HOST=db.example.com
 PG_PORT=5432
 PG_DBNAME=name
+
+# Redis конфигурация
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DB=0
 ```
 
 ### 4. Запуск проекта
@@ -135,6 +184,48 @@ docker compose up --build
    - access_token (для доступа к защищённым маршрутам).
    - refresh_token (для обновления access token).
 3. Токены передаются клиенту, который использует их для аутентификации при последующих запросах.
+
+## REST API Gateway
+
+Сервис предоставляет **REST API** через gRPC-Gateway для фронтенда.
+
+### Доступные endpoints:
+
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| POST | `/api/v1/auth/register` | Регистрация пользователя |
+| POST | `/api/v1/auth/login` | Вход в систему |
+| POST | `/api/v1/auth/refresh` | Обновление access токена |
+| POST | `/api/v1/auth/validate` | Проверка токена |
+| POST | `/api/v1/auth/logout` | Выход из системы |
+
+### Примеры запросов:
+
+**Регистрация:**
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "password": "password123"}'
+```
+
+**Вход:**
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "password": "password123"}'
+```
+
+**Обновление токена:**
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"refresh_token": "YOUR_REFRESH_TOKEN"}'
+```
+
+### Порты:
+
+- **gRPC**: `60051` (для внутренних сервисов)
+- **REST API**: `8080` (для фронтенда)
 
 ## Тестирование
 Для запуска тестов используйте команду:

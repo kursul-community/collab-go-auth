@@ -2,7 +2,9 @@ package user
 
 import (
 	"context"
+
 	"github.com/jackc/pgx/v5/pgxpool"
+
 	"go-auth/internal/entity"
 )
 
@@ -16,9 +18,11 @@ type Repository interface {
 	GetUserByEmail(ctx context.Context, email string) (*entity.User, error)
 	// GetUserById - получение пользователя по id
 	GetUserById(ctx context.Context, id string) (*entity.User, error)
+	// SetEmailVerified - установка флага email_verified
+	SetEmailVerified(ctx context.Context, userID string, verified bool) error
 }
 
-// repository - репозиторий для работы с PostgreSQL
+// repository - репозиторий для работы с PostgreSQL
 type repository struct {
 	db *pgxpool.Pool
 }
@@ -29,8 +33,8 @@ func NewRepository(db *pgxpool.Pool) Repository {
 }
 
 func (r *repository) CreateUser(ctx context.Context, user *entity.User) (string, error) {
-	query := `INSERT INTO users (id, email, password) VALUES ($1, $2, $3)`
-	_, err := r.db.Exec(ctx, query, user.ID, user.Email, user.Password)
+	query := `INSERT INTO users (id, email, password, email_verified) VALUES ($1, $2, $3, $4)`
+	_, err := r.db.Exec(ctx, query, user.ID, user.Email, user.Password, user.EmailVerified)
 	if err != nil {
 		return "", err
 	}
@@ -39,25 +43,32 @@ func (r *repository) CreateUser(ctx context.Context, user *entity.User) (string,
 }
 
 func (r *repository) GetUserByEmail(ctx context.Context, email string) (*entity.User, error) {
-	query := `SELECT id, email, password, is_active FROM users WHERE email = $1`
+	query := `SELECT id, email, password, is_active, email_verified FROM users WHERE email = $1`
 	row := r.db.QueryRow(ctx, query, email)
 
 	var user entity.User
 
-	if err := row.Scan(&user.ID, &user.Email, &user.Password, &user.IsActive); err != nil {
+	if err := row.Scan(&user.ID, &user.Email, &user.Password, &user.IsActive, &user.EmailVerified); err != nil {
 		return nil, err
 	}
 	return &user, nil
 }
 
 func (r *repository) GetUserById(ctx context.Context, id string) (*entity.User, error) {
-	query := `SELECT id, email, password, is_active FROM users WHERE id = $1`
+	query := `SELECT id, email, password, is_active, email_verified FROM users WHERE id = $1`
 	row := r.db.QueryRow(ctx, query, id)
 
 	var user entity.User
 
-	if err := row.Scan(&user.ID, &user.Email, &user.Password, &user.IsActive); err != nil {
+	if err := row.Scan(&user.ID, &user.Email, &user.Password, &user.IsActive, &user.EmailVerified); err != nil {
 		return nil, err
 	}
 	return &user, nil
+}
+
+// SetEmailVerified - установка флага email_verified для пользователя
+func (r *repository) SetEmailVerified(ctx context.Context, userID string, verified bool) error {
+	query := `UPDATE users SET email_verified = $1 WHERE id = $2`
+	_, err := r.db.Exec(ctx, query, verified, userID)
+	return err
 }

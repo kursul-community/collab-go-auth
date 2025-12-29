@@ -83,11 +83,55 @@ func (s *AuthServer) ValidateToken(ctx context.Context, req *pb.ValidateTokenReq
 	return &pb.ValidateTokenResponse{Valid: valid}, nil
 }
 
-// Logout - выход из системы
-func (s *AuthServer) Logout(ctx context.Context, req *pb.LogoutRequest) (*pb.LogoutResponse, error) {
-	err := s.auth.Logout(req.AccessToken)
+// EmailValidation - структура для валидации email
+type EmailValidation struct {
+	Email string `validate:"required,email"`
+}
+
+// ResendVerificationEmail - повторная отправка кода верификации email
+func (s *AuthServer) ResendVerificationEmail(ctx context.Context, req *pb.ResendVerificationEmailRequest) (*pb.ResendVerificationEmailResponse, error) {
+	// Валидация email
+	validateReq := &EmailValidation{
+		Email: req.Email,
+	}
+	if err := validator.ValidateRequest(validateReq); err != nil {
+		return nil, err
+	}
+
+	message, requestID, err := s.auth.ResendVerificationEmail(req.Email, req.RequestId)
 	if err != nil {
 		return nil, err
 	}
-	return &pb.LogoutResponse{}, nil
+	return &pb.ResendVerificationEmailResponse{
+		Message:   message,
+		RequestId: requestID,
+	}, nil
+}
+
+// VerifyEmailValidation - структура для валидации верификации email
+type VerifyEmailValidation struct {
+	Email string `validate:"required,email"`
+	Code  string `validate:"required,len=6"`
+}
+
+// VerifyEmail - верификация email по коду
+func (s *AuthServer) VerifyEmail(ctx context.Context, req *pb.VerifyEmailRequest) (*pb.VerifyEmailResponse, error) {
+	// Валидация
+	validateReq := &VerifyEmailValidation{
+		Email: req.Email,
+		Code:  req.Code,
+	}
+	if err := validator.ValidateRequest(validateReq); err != nil {
+		return nil, err
+	}
+
+	success, message, requestID, err := s.auth.VerifyEmail(req.Email, req.Code, req.RequestId)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.VerifyEmailResponse{
+		Success:   success,
+		Message:   message,
+		RequestId: requestID,
+	}, nil
 }

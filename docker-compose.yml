@@ -16,6 +16,20 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   app:
     build:
       context: .
@@ -31,14 +45,19 @@ services:
       DB_MAX_CONNS: ${DB_MAX_CONNS}
       DB_CONN_TIMEOUT: ${DB_CONN_TIMEOUT}
       MIGRATIONS_PATH: /app/migrations
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       - ./migrations:/app/migrations
       - ./config:/app/config
     ports:
-      - "60051:60051"
+      - "60051:60051"  # gRPC
+      - "8080:8080"    # HTTP REST Gateway
     command: >
       sh -c "
         /app/migrate up &&
@@ -52,3 +71,4 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:

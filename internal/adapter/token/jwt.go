@@ -28,6 +28,8 @@ type JWTToken interface {
 	ValidateToken(token string) (bool, error)
 	// RefreshAccessToken - обновление access токена
 	RefreshAccessToken(refreshToken string) (string, error)
+	// GetUserIDFromToken - извлечение userID из токена
+	GetUserIDFromToken(token string) (string, error)
 }
 
 // service - реализация интерфейса Service
@@ -99,6 +101,15 @@ func (s *jwtToken) generateToken(userID string, ttl time.Duration) (string, erro
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(s.secret))
+}
+
+// GetUserIDFromToken - извлечение userID из токена
+func (s *jwtToken) GetUserIDFromToken(token string) (string, error) {
+	claims, err := s.parseToken(token)
+	if err != nil {
+		return "", err
+	}
+	return claims.Subject, nil
 }
 
 // parseToken - парсинг токена и валидация
