@@ -84,14 +84,14 @@ redis:
 # -----------------------------------------------------------------------------
 smtp:
   host: "smtp.gmail.com"     # SMTP сервер (gmail, yandex, mailgun и др.)
-  port: 587                  # Порт (587 для TLS, 465 для SSL, 25 для незащищённого)
-  username: ""               # Email отправителя (переопределяется через SMTP_USERNAME)
-  password: ""               # Пароль/App Password (переопределяется через SMTP_PASSWORD)
-  from: "noreply@example.com" # Адрес отправителя в письмах
+  port: 465                  # Порт (587 для TLS, 465 для SSL) - SSL более надёжен
+  username: "kursuldigitals@gmail.com"               # Email отправителя (переопределяется через SMTP_USERNAME)
+  password: "utscrnzrfyvronsz"               # Пароль/App Password (переопределяется через SMTP_PASSWORD)
+  from: "kursuldigitals@gmail.com" # Адрес отправителя в письмах
   fromName: "Go Auth Service" # Имя отправителя
-  useTLS: true               # Использовать TLS
-  useSSL: false              # Использовать SSL (для порта 465)
-  timeout: "10s"             # Таймаут отправки
+  useTLS: false              # Использовать TLS (порт 587)
+  useSSL: true               # Использовать SSL (порт 465) - более надёжно
+  timeout: "30s"             # Таймаут отправки (увеличен для стабильности)
   # Настройки шаблонов писем
   templates:
     verificationSubject: "Подтверждение email"

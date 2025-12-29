@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
+	"go-auth/internal/adapter/email"
 	"go-auth/internal/adapter/token"
 	"go-auth/internal/entity"
 	tokenrepo "go-auth/internal/repo/token"
@@ -57,6 +58,7 @@ type auth struct {
 	userRepo     user.Repository
 	tokenRepo    tokenrepo.Repository // Redis репозиторий для токенов
 	tokenService token.JWTToken
+	mailer       email.Mailer // Email сервис для отправки писем
 	accessTTL    time.Duration
 	refreshTTL   time.Duration
 }
@@ -66,12 +68,14 @@ func NewAuthUseCase(
 	userRepo user.Repository,
 	tokenRepo tokenrepo.Repository,
 	tokenSvc token.JWTToken,
+	mailer email.Mailer,
 	accessTTL, refreshTTL time.Duration,
 ) AuthUseCase {
 	return &auth{
 		userRepo:     userRepo,
 		tokenRepo:    tokenRepo,
 		tokenService: tokenSvc,
+		mailer:       mailer,
 		accessTTL:    accessTTL,
 		refreshTTL:   refreshTTL,
 	}
@@ -89,11 +93,17 @@ func generateVerificationCode() (string, error) {
 	return fmt.Sprintf("%06d", code), nil
 }
 
-// sendVerificationCode - отправка кода верификации (TODO: интеграция с email сервисом)
-func (uc *auth) sendVerificationCode(email string, code string, requestID string) error {
-	// TODO: Интегрировать с реальным email сервисом (SMTP, SendGrid, etc.)
-	// Сейчас просто логируем код для тестирования
-	log.Printf("[RequestID: %s] [EMAIL SERVICE] Verification code for %s: %s", requestID, email, code)
+// sendVerificationCode - отправка кода верификации на email
+func (uc *auth) sendVerificationCode(emailAddr string, code string, requestID string) error {
+	log.Printf("[RequestID: %s] Sending verification code to %s", requestID, emailAddr)
+	
+	// Отправляем письмо с кодом верификации
+	if err := uc.mailer.SendVerificationCode(emailAddr, code); err != nil {
+		log.Printf("[RequestID: %s] Failed to send verification email: %v", requestID, err)
+		return fmt.Errorf("failed to send verification email: %w", err)
+	}
+	
+	log.Printf("[RequestID: %s] Verification email sent successfully to %s", requestID, emailAddr)
 	return nil
 }
 

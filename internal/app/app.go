@@ -13,6 +13,7 @@ import (
 	"go-auth/config"
 	"go-auth/gen/auth"
 	"go-auth/internal/adapter/database"
+	emailadapter "go-auth/internal/adapter/email"
 	redisadapter "go-auth/internal/adapter/redis"
 	"go-auth/internal/adapter/token"
 	grpcauth "go-auth/internal/controller/grpc/auth"
@@ -54,11 +55,19 @@ func Run(cfg *config.Config, devMode bool) {
 		logger.Fatalf("Failed to initialize token service: %v", err)
 	}
 
+	// Создаем email сервис для отправки писем
+	mailer, err := emailadapter.New(cfg.SMTP)
+	if err != nil {
+		logger.Fatalf("Failed to initialize email service: %v", err)
+	}
+	logger.Printf("Email service initialized (SMTP: %s)", cfg.SMTP.Addr())
+
 	// Создаем слой usecase с TTL параметрами
 	authUseCase := usecase.NewAuthUseCase(
 		userRepo,
 		tokenRepo,
 		tokenSvc,
+		mailer,
 		cfg.Token.AccessTTL,
 		cfg.Token.RefreshTTL,
 	)

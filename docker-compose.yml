@@ -57,7 +57,7 @@ services:
       - ./config:/app/config
     ports:
       - "60051:60051"  # gRPC
-      - "8080:8080"    # HTTP REST Gateway
+      - "8083:8080"    # HTTP REST Gateway
     command: >
       sh -c "
         /app/migrate up &&

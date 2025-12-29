@@ -132,3 +132,28 @@ func (m *MockTokenService) GetUserIDFromToken(token string) (string, error) {
 	args := m.Called(token)
 	return args.String(0), args.Error(1)
 }
+
+// MockMailer - мок для email сервиса
+type MockMailer struct {
+	mock.Mock
+}
+
+func (m *MockMailer) SendVerificationCode(to, code string) error {
+	args := m.Called(to, code)
+	return args.Error(0)
+}
+
+func (m *MockMailer) SendWelcome(to, username string) error {
+	args := m.Called(to, username)
+	return args.Error(0)
+}
+
+func (m *MockMailer) SendPasswordReset(to, resetLink string) error {
+	args := m.Called(to, resetLink)
+	return args.Error(0)
+}
+
+func (m *MockMailer) Send(to, subject, body string) error {
+	args := m.Called(to, subject, body)
+	return args.Error(0)
+}
