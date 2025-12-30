@@ -25,6 +25,8 @@ const (
 	Auth_ValidateToken_FullMethodName           = "/auth.Auth/ValidateToken"
 	Auth_ResendVerificationEmail_FullMethodName = "/auth.Auth/ResendVerificationEmail"
 	Auth_VerifyEmail_FullMethodName             = "/auth.Auth/VerifyEmail"
+	Auth_RestorePasswordBegin_FullMethodName    = "/auth.Auth/RestorePasswordBegin"
+	Auth_RestorePasswordComplete_FullMethodName = "/auth.Auth/RestorePasswordComplete"
 )
 
 // AuthClient is the client API for Auth service.
@@ -39,6 +41,10 @@ type AuthClient interface {
 	ResendVerificationEmail(ctx context.Context, in *ResendVerificationEmailRequest, opts ...grpc.CallOption) (*ResendVerificationEmailResponse, error)
 	// Верификация email по коду
 	VerifyEmail(ctx context.Context, in *VerifyEmailRequest, opts ...grpc.CallOption) (*VerifyEmailResponse, error)
+	// Начало восстановления пароля
+	RestorePasswordBegin(ctx context.Context, in *RestorePasswordBeginRequest, opts ...grpc.CallOption) (*RestorePasswordBeginResponse, error)
+	// Завершение восстановления пароля
+	RestorePasswordComplete(ctx context.Context, in *RestorePasswordCompleteRequest, opts ...grpc.CallOption) (*RestorePasswordCompleteResponse, error)
 }
 
 type authClient struct {
@@ -109,6 +115,26 @@ func (c *authClient) VerifyEmail(ctx context.Context, in *VerifyEmailRequest, op
 	return out, nil
 }
 
+func (c *authClient) RestorePasswordBegin(ctx context.Context, in *RestorePasswordBeginRequest, opts ...grpc.CallOption) (*RestorePasswordBeginResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RestorePasswordBeginResponse)
+	err := c.cc.Invoke(ctx, Auth_RestorePasswordBegin_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authClient) RestorePasswordComplete(ctx context.Context, in *RestorePasswordCompleteRequest, opts ...grpc.CallOption) (*RestorePasswordCompleteResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RestorePasswordCompleteResponse)
+	err := c.cc.Invoke(ctx, Auth_RestorePasswordComplete_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServer is the server API for Auth service.
 // All implementations must embed UnimplementedAuthServer
 // for forward compatibility.
@@ -121,6 +147,10 @@ type AuthServer interface {
 	ResendVerificationEmail(context.Context, *ResendVerificationEmailRequest) (*ResendVerificationEmailResponse, error)
 	// Верификация email по коду
 	VerifyEmail(context.Context, *VerifyEmailRequest) (*VerifyEmailResponse, error)
+	// Начало восстановления пароля
+	RestorePasswordBegin(context.Context, *RestorePasswordBeginRequest) (*RestorePasswordBeginResponse, error)
+	// Завершение восстановления пароля
+	RestorePasswordComplete(context.Context, *RestorePasswordCompleteRequest) (*RestorePasswordCompleteResponse, error)
 	mustEmbedUnimplementedAuthServer()
 }
 
@@ -148,6 +178,12 @@ func (UnimplementedAuthServer) ResendVerificationEmail(context.Context, *ResendV
 }
 func (UnimplementedAuthServer) VerifyEmail(context.Context, *VerifyEmailRequest) (*VerifyEmailResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method VerifyEmail not implemented")
+}
+func (UnimplementedAuthServer) RestorePasswordBegin(context.Context, *RestorePasswordBeginRequest) (*RestorePasswordBeginResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RestorePasswordBegin not implemented")
+}
+func (UnimplementedAuthServer) RestorePasswordComplete(context.Context, *RestorePasswordCompleteRequest) (*RestorePasswordCompleteResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RestorePasswordComplete not implemented")
 }
 func (UnimplementedAuthServer) mustEmbedUnimplementedAuthServer() {}
 func (UnimplementedAuthServer) testEmbeddedByValue()              {}
@@ -278,6 +314,42 @@ func _Auth_VerifyEmail_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Auth_RestorePasswordBegin_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RestorePasswordBeginRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServer).RestorePasswordBegin(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Auth_RestorePasswordBegin_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServer).RestorePasswordBegin(ctx, req.(*RestorePasswordBeginRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Auth_RestorePasswordComplete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RestorePasswordCompleteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServer).RestorePasswordComplete(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Auth_RestorePasswordComplete_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServer).RestorePasswordComplete(ctx, req.(*RestorePasswordCompleteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Auth_ServiceDesc is the grpc.ServiceDesc for Auth service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -308,6 +380,14 @@ var Auth_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "VerifyEmail",
 			Handler:    _Auth_VerifyEmail_Handler,
+		},
+		{
+			MethodName: "RestorePasswordBegin",
+			Handler:    _Auth_RestorePasswordBegin_Handler,
+		},
+		{
+			MethodName: "RestorePasswordComplete",
+			Handler:    _Auth_RestorePasswordComplete_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

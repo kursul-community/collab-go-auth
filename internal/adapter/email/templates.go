@@ -17,6 +17,8 @@ type WelcomeData struct {
 // PasswordResetData - данные для письма сброса пароля
 type PasswordResetData struct {
 	ResetLink string
+	UserID    string
+	RequestID string
 	AppName   string
 }
 

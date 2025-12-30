@@ -70,6 +70,8 @@ func Run(cfg *config.Config, devMode bool) {
 		mailer,
 		cfg.Token.AccessTTL,
 		cfg.Token.RefreshTTL,
+		cfg.PasswordReset.TokenTTL,
+		cfg.PasswordReset.FrontendURL,
 	)
 
 	// Создаем gRPC-сервер

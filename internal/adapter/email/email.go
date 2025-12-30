@@ -17,7 +17,7 @@ import (
 type Mailer interface {
 	SendVerificationCode(to, code string) error
 	SendWelcome(to, username string) error
-	SendPasswordReset(to, resetLink string) error
+	SendPasswordReset(to, userID, requestID, frontendURL string) error
 	Send(to, subject, body string) error
 }
 
@@ -82,9 +82,14 @@ func (m *SMTPMailer) SendWelcome(to, username string) error {
 }
 
 // SendPasswordReset отправляет письмо для сброса пароля
-func (m *SMTPMailer) SendPasswordReset(to, resetLink string) error {
+func (m *SMTPMailer) SendPasswordReset(to, userID, requestID, frontendURL string) error {
+	// Формируем ссылку для сброса пароля
+	resetLink := fmt.Sprintf("%s/auth/login/password-recovery?userId=%s&requestId=%s", frontendURL, userID, requestID)
+
 	data := PasswordResetData{
 		ResetLink: resetLink,
+		UserID:    userID,
+		RequestID: requestID,
 		AppName:   m.cfg.FromName,
 	}
 

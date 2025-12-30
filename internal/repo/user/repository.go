@@ -20,6 +20,8 @@ type Repository interface {
 	GetUserById(ctx context.Context, id string) (*entity.User, error)
 	// SetEmailVerified - установка флага email_verified
 	SetEmailVerified(ctx context.Context, userID string, verified bool) error
+	// UpdatePassword - обновление пароля пользователя
+	UpdatePassword(ctx context.Context, userID string, hashedPassword string) error
 }
 
 // repository - репозиторий для работы с PostgreSQL
@@ -70,5 +72,12 @@ func (r *repository) GetUserById(ctx context.Context, id string) (*entity.User, 
 func (r *repository) SetEmailVerified(ctx context.Context, userID string, verified bool) error {
 	query := `UPDATE users SET email_verified = $1 WHERE id = $2`
 	_, err := r.db.Exec(ctx, query, verified, userID)
+	return err
+}
+
+// UpdatePassword - обновление пароля пользователя
+func (r *repository) UpdatePassword(ctx context.Context, userID string, hashedPassword string) error {
+	query := `UPDATE users SET password = $1 WHERE id = $2`
+	_, err := r.db.Exec(ctx, query, hashedPassword, userID)
 	return err
 }

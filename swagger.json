@@ -288,6 +288,94 @@
           }
         }
       }
+    },
+    "/auth/restore-password/begin": {
+      "post": {
+        "tags": ["Auth"],
+        "description": "Begin password restore pipeline. Sends email with reset link.",
+        "operationId": "restorePasswordBegin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestorePasswordBeginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Restore password email sent successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmptyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/restore-password/complete": {
+      "post": {
+        "tags": ["Auth"],
+        "description": "Complete password restore pipeline and change password",
+        "operationId": "restorePasswordComplete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestorePasswordCompleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Password changed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmptyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or expired password reset token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -389,6 +477,7 @@
       },
       "ResendVerificationEmailRequest": {
         "type": "object",
+        "description": "ВАЖНО: requestId должен быть равен userId",
         "required": ["userId", "requestId"],
         "properties": {
           "userId": {
@@ -399,12 +488,13 @@
           "requestId": {
             "type": "string",
             "format": "uuid",
-            "description": "UUID запроса для отслеживания"
+            "description": "UUID запроса (должен быть равен userId)"
           }
         }
       },
       "VerifyEmailRequest": {
         "type": "object",
+        "description": "ВАЖНО: requestId должен быть равен userId",
         "required": ["userId", "requestId", "code"],
         "properties": {
           "userId": {
@@ -415,7 +505,7 @@
           "requestId": {
             "type": "string",
             "format": "uuid",
-            "description": "UUID запроса для отслеживания"
+            "description": "UUID запроса (должен быть равен userId)"
           },
           "code": {
             "type": "string",
@@ -427,6 +517,39 @@
       "EmptyResponse": {
         "type": "object",
         "description": "Пустой ответ при успехе"
+      },
+      "RestorePasswordBeginRequest": {
+        "type": "object",
+        "required": ["email"],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Email пользователя"
+          }
+        }
+      },
+      "RestorePasswordCompleteRequest": {
+        "type": "object",
+        "required": ["user_id", "request_id", "password"],
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID пользователя (из ссылки в email)"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID запроса восстановления (из ссылки в email)"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 128,
+            "description": "Новый пароль"
+          }
+        }
       }
     }
   },

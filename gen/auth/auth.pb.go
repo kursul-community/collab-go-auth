@@ -584,6 +584,184 @@ func (*VerifyEmailResponse) Descriptor() ([]byte, []int) {
 	return file_auth_proto_rawDescGZIP(), []int{11}
 }
 
+// Запрос на начало восстановления пароля
+type RestorePasswordBeginRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"` // Email пользователя
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RestorePasswordBeginRequest) Reset() {
+	*x = RestorePasswordBeginRequest{}
+	mi := &file_auth_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RestorePasswordBeginRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RestorePasswordBeginRequest) ProtoMessage() {}
+
+func (x *RestorePasswordBeginRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RestorePasswordBeginRequest.ProtoReflect.Descriptor instead.
+func (*RestorePasswordBeginRequest) Descriptor() ([]byte, []int) {
+	return file_auth_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *RestorePasswordBeginRequest) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+type RestorePasswordBeginResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RestorePasswordBeginResponse) Reset() {
+	*x = RestorePasswordBeginResponse{}
+	mi := &file_auth_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RestorePasswordBeginResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RestorePasswordBeginResponse) ProtoMessage() {}
+
+func (x *RestorePasswordBeginResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RestorePasswordBeginResponse.ProtoReflect.Descriptor instead.
+func (*RestorePasswordBeginResponse) Descriptor() ([]byte, []int) {
+	return file_auth_proto_rawDescGZIP(), []int{13}
+}
+
+// Запрос на завершение восстановления пароля
+type RestorePasswordCompleteRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`          // UUID пользователя
+	RequestId     string                 `protobuf:"bytes,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"` // UUID запроса восстановления
+	Password      string                 `protobuf:"bytes,3,opt,name=password,proto3" json:"password,omitempty"`                    // Новый пароль
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RestorePasswordCompleteRequest) Reset() {
+	*x = RestorePasswordCompleteRequest{}
+	mi := &file_auth_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RestorePasswordCompleteRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RestorePasswordCompleteRequest) ProtoMessage() {}
+
+func (x *RestorePasswordCompleteRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RestorePasswordCompleteRequest.ProtoReflect.Descriptor instead.
+func (*RestorePasswordCompleteRequest) Descriptor() ([]byte, []int) {
+	return file_auth_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *RestorePasswordCompleteRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *RestorePasswordCompleteRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *RestorePasswordCompleteRequest) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+type RestorePasswordCompleteResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RestorePasswordCompleteResponse) Reset() {
+	*x = RestorePasswordCompleteResponse{}
+	mi := &file_auth_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RestorePasswordCompleteResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RestorePasswordCompleteResponse) ProtoMessage() {}
+
+func (x *RestorePasswordCompleteResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RestorePasswordCompleteResponse.ProtoReflect.Descriptor instead.
+func (*RestorePasswordCompleteResponse) Descriptor() ([]byte, []int) {
+	return file_auth_proto_rawDescGZIP(), []int{15}
+}
+
 var File_auth_proto protoreflect.FileDescriptor
 
 const file_auth_proto_rawDesc = "" +
@@ -619,14 +797,25 @@ const file_auth_proto_rawDesc = "" +
 	"\n" +
 	"request_id\x18\x02 \x01(\tR\trequestId\x12\x12\n" +
 	"\x04code\x18\x03 \x01(\tR\x04code\"\x15\n" +
-	"\x13VerifyEmailResponse2\x91\x05\n" +
+	"\x13VerifyEmailResponse\"3\n" +
+	"\x1bRestorePasswordBeginRequest\x12\x14\n" +
+	"\x05email\x18\x01 \x01(\tR\x05email\"\x1e\n" +
+	"\x1cRestorePasswordBeginResponse\"t\n" +
+	"\x1eRestorePasswordCompleteRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x02 \x01(\tR\trequestId\x12\x1a\n" +
+	"\bpassword\x18\x03 \x01(\tR\bpassword\"!\n" +
+	"\x1fRestorePasswordCompleteResponse2\xbd\a\n" +
 	"\x04Auth\x12[\n" +
 	"\bRegister\x12\x15.auth.RegisterRequest\x1a\x16.auth.RegisterResponse\" \x82\xd3\xe4\x93\x02\x1a:\x01*\"\x15/api/v1/auth/register\x12O\n" +
 	"\x05Login\x12\x12.auth.LoginRequest\x1a\x13.auth.LoginResponse\"\x1d\x82\xd3\xe4\x93\x02\x17:\x01*\"\x12/api/v1/auth/login\x12f\n" +
 	"\fRefreshToken\x12\x19.auth.RefreshTokenRequest\x1a\x1a.auth.RefreshTokenResponse\"\x1f\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/api/v1/auth/refresh\x12j\n" +
 	"\rValidateToken\x12\x1a.auth.ValidateTokenRequest\x1a\x1b.auth.ValidateTokenResponse\" \x82\xd3\xe4\x93\x02\x1a:\x01*\"\x15/api/v1/auth/validate\x12\x94\x01\n" +
 	"\x17ResendVerificationEmail\x12$.auth.ResendVerificationEmailRequest\x1a%.auth.ResendVerificationEmailResponse\",\x82\xd3\xe4\x93\x02&:\x01*\"!/api/v1/auth/sign-up/resend-email\x12p\n" +
-	"\vVerifyEmail\x12\x18.auth.VerifyEmailRequest\x1a\x19.auth.VerifyEmailResponse\",\x82\xd3\xe4\x93\x02&:\x01*\"!/api/v1/auth/sign-up/verify-emailB\x12Z\x10go-auth/gen/authb\x06proto3"
+	"\vVerifyEmail\x12\x18.auth.VerifyEmailRequest\x1a\x19.auth.VerifyEmailResponse\",\x82\xd3\xe4\x93\x02&:\x01*\"!/api/v1/auth/sign-up/verify-email\x12\x8d\x01\n" +
+	"\x14RestorePasswordBegin\x12!.auth.RestorePasswordBeginRequest\x1a\".auth.RestorePasswordBeginResponse\".\x82\xd3\xe4\x93\x02(:\x01*\"#/api/v1/auth/restore-password/begin\x12\x99\x01\n" +
+	"\x17RestorePasswordComplete\x12$.auth.RestorePasswordCompleteRequest\x1a%.auth.RestorePasswordCompleteResponse\"1\x82\xd3\xe4\x93\x02+:\x01*\"&/api/v1/auth/restore-password/completeB\x12Z\x10go-auth/gen/authb\x06proto3"
 
 var (
 	file_auth_proto_rawDescOnce sync.Once
@@ -640,7 +829,7 @@ func file_auth_proto_rawDescGZIP() []byte {
 	return file_auth_proto_rawDescData
 }
 
-var file_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_auth_proto_goTypes = []any{
 	(*RegisterRequest)(nil),                 // 0: auth.RegisterRequest
 	(*RegisterResponse)(nil),                // 1: auth.RegisterResponse
@@ -654,6 +843,10 @@ var file_auth_proto_goTypes = []any{
 	(*ResendVerificationEmailResponse)(nil), // 9: auth.ResendVerificationEmailResponse
 	(*VerifyEmailRequest)(nil),              // 10: auth.VerifyEmailRequest
 	(*VerifyEmailResponse)(nil),             // 11: auth.VerifyEmailResponse
+	(*RestorePasswordBeginRequest)(nil),     // 12: auth.RestorePasswordBeginRequest
+	(*RestorePasswordBeginResponse)(nil),    // 13: auth.RestorePasswordBeginResponse
+	(*RestorePasswordCompleteRequest)(nil),  // 14: auth.RestorePasswordCompleteRequest
+	(*RestorePasswordCompleteResponse)(nil), // 15: auth.RestorePasswordCompleteResponse
 }
 var file_auth_proto_depIdxs = []int32{
 	0,  // 0: auth.Auth.Register:input_type -> auth.RegisterRequest
@@ -662,14 +855,18 @@ var file_auth_proto_depIdxs = []int32{
 	6,  // 3: auth.Auth.ValidateToken:input_type -> auth.ValidateTokenRequest
 	8,  // 4: auth.Auth.ResendVerificationEmail:input_type -> auth.ResendVerificationEmailRequest
 	10, // 5: auth.Auth.VerifyEmail:input_type -> auth.VerifyEmailRequest
-	1,  // 6: auth.Auth.Register:output_type -> auth.RegisterResponse
-	3,  // 7: auth.Auth.Login:output_type -> auth.LoginResponse
-	5,  // 8: auth.Auth.RefreshToken:output_type -> auth.RefreshTokenResponse
-	7,  // 9: auth.Auth.ValidateToken:output_type -> auth.ValidateTokenResponse
-	9,  // 10: auth.Auth.ResendVerificationEmail:output_type -> auth.ResendVerificationEmailResponse
-	11, // 11: auth.Auth.VerifyEmail:output_type -> auth.VerifyEmailResponse
-	6,  // [6:12] is the sub-list for method output_type
-	0,  // [0:6] is the sub-list for method input_type
+	12, // 6: auth.Auth.RestorePasswordBegin:input_type -> auth.RestorePasswordBeginRequest
+	14, // 7: auth.Auth.RestorePasswordComplete:input_type -> auth.RestorePasswordCompleteRequest
+	1,  // 8: auth.Auth.Register:output_type -> auth.RegisterResponse
+	3,  // 9: auth.Auth.Login:output_type -> auth.LoginResponse
+	5,  // 10: auth.Auth.RefreshToken:output_type -> auth.RefreshTokenResponse
+	7,  // 11: auth.Auth.ValidateToken:output_type -> auth.ValidateTokenResponse
+	9,  // 12: auth.Auth.ResendVerificationEmail:output_type -> auth.ResendVerificationEmailResponse
+	11, // 13: auth.Auth.VerifyEmail:output_type -> auth.VerifyEmailResponse
+	13, // 14: auth.Auth.RestorePasswordBegin:output_type -> auth.RestorePasswordBeginResponse
+	15, // 15: auth.Auth.RestorePasswordComplete:output_type -> auth.RestorePasswordCompleteResponse
+	8,  // [8:16] is the sub-list for method output_type
+	0,  // [0:8] is the sub-list for method input_type
 	0,  // [0:0] is the sub-list for extension type_name
 	0,  // [0:0] is the sub-list for extension extendee
 	0,  // [0:0] is the sub-list for field type_name
@@ -686,7 +883,7 @@ func file_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_auth_proto_rawDesc), len(file_auth_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

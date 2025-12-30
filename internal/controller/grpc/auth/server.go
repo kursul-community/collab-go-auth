@@ -2,8 +2,13 @@ package grpcauth
 
 import (
 	"context"
+	"errors"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	pb "go-auth/gen/auth"
-	"go-auth/internal/usecase/auth"
+	usecase "go-auth/internal/usecase/auth"
 	"go-auth/pkg/validator"
 )
 
@@ -97,12 +102,21 @@ func (s *AuthServer) ResendVerificationEmail(ctx context.Context, req *pb.Resend
 		RequestID: req.RequestId,
 	}
 	if err := validator.ValidateRequest(validateReq); err != nil {
-		return nil, err
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	err := s.auth.ResendVerificationEmail(req.UserId, req.RequestId)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, usecase.ErrInvalidRequestID) {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+		if errors.Is(err, usecase.ErrUserNotFound) {
+			return nil, status.Error(codes.NotFound, err.Error())
+		}
+		if errors.Is(err, usecase.ErrEmailAlreadyVerified) {
+			return nil, status.Error(codes.AlreadyExists, err.Error())
+		}
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 	return &pb.ResendVerificationEmailResponse{}, nil
 }
@@ -123,12 +137,84 @@ func (s *AuthServer) VerifyEmail(ctx context.Context, req *pb.VerifyEmailRequest
 		Code:      req.Code,
 	}
 	if err := validator.ValidateRequest(validateReq); err != nil {
-		return nil, err
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	err := s.auth.VerifyEmail(req.UserId, req.RequestId, req.Code)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, usecase.ErrInvalidRequestID) {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+		if errors.Is(err, usecase.ErrUserNotFound) {
+			return nil, status.Error(codes.NotFound, err.Error())
+		}
+		if errors.Is(err, usecase.ErrEmailAlreadyVerified) {
+			return nil, status.Error(codes.AlreadyExists, err.Error())
+		}
+		if errors.Is(err, usecase.ErrInvalidVerificationCode) {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 	return &pb.VerifyEmailResponse{}, nil
+}
+
+// === Восстановление пароля ===
+
+// RestorePasswordBeginValidation - структура для валидации запроса начала восстановления пароля
+type RestorePasswordBeginValidation struct {
+	Email string `validate:"required,email"`
+}
+
+// RestorePasswordBegin - начало восстановления пароля
+func (s *AuthServer) RestorePasswordBegin(ctx context.Context, req *pb.RestorePasswordBeginRequest) (*pb.RestorePasswordBeginResponse, error) {
+	// Валидация
+	validateReq := &RestorePasswordBeginValidation{
+		Email: req.Email,
+	}
+	if err := validator.ValidateRequest(validateReq); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	err := s.auth.RestorePasswordBegin(req.Email)
+	if err != nil {
+		// Для безопасности не раскрываем детали ошибки
+		return nil, status.Error(codes.Internal, "failed to process request")
+	}
+	return &pb.RestorePasswordBeginResponse{}, nil
+}
+
+// RestorePasswordCompleteValidation - структура для валидации запроса завершения восстановления пароля
+type RestorePasswordCompleteValidation struct {
+	UserID    string `validate:"required,uuid"`
+	RequestID string `validate:"required,uuid"`
+	Password  string `validate:"required,min=6,max=128"`
+}
+
+// RestorePasswordComplete - завершение восстановления пароля
+func (s *AuthServer) RestorePasswordComplete(ctx context.Context, req *pb.RestorePasswordCompleteRequest) (*pb.RestorePasswordCompleteResponse, error) {
+	// Валидация
+	validateReq := &RestorePasswordCompleteValidation{
+		UserID:    req.UserId,
+		RequestID: req.RequestId,
+		Password:  req.Password,
+	}
+	if err := validator.ValidateRequest(validateReq); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	err := s.auth.RestorePasswordComplete(req.UserId, req.RequestId, req.Password)
+	if err != nil {
+		if errors.Is(err, usecase.ErrUserNotFound) {
+			return nil, status.Error(codes.NotFound, err.Error())
+		}
+		if errors.Is(err, usecase.ErrInvalidPasswordResetToken) {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+		if errors.Is(err, usecase.ErrMinLengthPswd) {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return &pb.RestorePasswordCompleteResponse{}, nil
 }

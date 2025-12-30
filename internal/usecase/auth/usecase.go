@@ -22,17 +22,22 @@ import (
 // TTL для кода верификации email (15 минут)
 const VerificationCodeTTL = 15 * time.Minute
 
+// TTL для токена сброса пароля по умолчанию (1 час)
+const DefaultPasswordResetTTL = 1 * time.Hour
+
 var (
-	ErrInvalidCredentials      = errors.New("invalid credentials")
-	ErrExistingUser            = errors.New("email already in use")
-	ErrUserNotActive           = errors.New("user account is not active")
-	ErrAccessTokenNotFound     = errors.New("access token not found or revoked")
-	ErrMinLengthPswd           = errors.New("password length must be between 6 and 128 characters")
-	ErrInvalidRefreshToken     = errors.New("invalid or expired refresh token")
-	ErrRefreshTokenNotFound    = errors.New("refresh token not found in storage")
-	ErrUserNotFound            = errors.New("user not found")
-	ErrEmailAlreadyVerified    = errors.New("email already verified")
-	ErrInvalidVerificationCode = errors.New("invalid or expired verification code")
+	ErrInvalidCredentials        = errors.New("invalid credentials")
+	ErrExistingUser              = errors.New("email already in use")
+	ErrUserNotActive             = errors.New("user account is not active")
+	ErrAccessTokenNotFound       = errors.New("access token not found or revoked")
+	ErrMinLengthPswd             = errors.New("password length must be between 6 and 128 characters")
+	ErrInvalidRefreshToken       = errors.New("invalid or expired refresh token")
+	ErrRefreshTokenNotFound      = errors.New("refresh token not found in storage")
+	ErrUserNotFound              = errors.New("user not found")
+	ErrEmailAlreadyVerified      = errors.New("email already verified")
+	ErrInvalidVerificationCode   = errors.New("invalid or expired verification code")
+	ErrInvalidRequestID          = errors.New("requestId must be equal to userId")
+	ErrInvalidPasswordResetToken = errors.New("invalid or expired password reset token")
 )
 
 var _ AuthUseCase = (*auth)(nil)
@@ -51,16 +56,22 @@ type AuthUseCase interface {
 	ResendVerificationEmail(userID string, requestID string) error
 	// VerifyEmail - верификация email по коду
 	VerifyEmail(userID string, requestID string, code string) error
+	// RestorePasswordBegin - начало восстановления пароля
+	RestorePasswordBegin(email string) error
+	// RestorePasswordComplete - завершение восстановления пароля
+	RestorePasswordComplete(userID string, requestID string, newPassword string) error
 }
 
 // Auth - структура для аутентификации
 type auth struct {
-	userRepo     user.Repository
-	tokenRepo    tokenrepo.Repository // Redis репозиторий для токенов
-	tokenService token.JWTToken
-	mailer       email.Mailer // Email сервис для отправки писем
-	accessTTL    time.Duration
-	refreshTTL   time.Duration
+	userRepo         user.Repository
+	tokenRepo        tokenrepo.Repository // Redis репозиторий для токенов
+	tokenService     token.JWTToken
+	mailer           email.Mailer // Email сервис для отправки писем
+	accessTTL        time.Duration
+	refreshTTL       time.Duration
+	passwordResetTTL time.Duration // TTL для токена сброса пароля
+	frontendURL      string        // URL фронтенда для ссылок
 }
 
 // NewAuthUseCase - конструктор для auth
@@ -70,14 +81,21 @@ func NewAuthUseCase(
 	tokenSvc token.JWTToken,
 	mailer email.Mailer,
 	accessTTL, refreshTTL time.Duration,
+	passwordResetTTL time.Duration,
+	frontendURL string,
 ) AuthUseCase {
+	if passwordResetTTL == 0 {
+		passwordResetTTL = DefaultPasswordResetTTL
+	}
 	return &auth{
-		userRepo:     userRepo,
-		tokenRepo:    tokenRepo,
-		tokenService: tokenSvc,
-		mailer:       mailer,
-		accessTTL:    accessTTL,
-		refreshTTL:   refreshTTL,
+		userRepo:         userRepo,
+		tokenRepo:        tokenRepo,
+		tokenService:     tokenSvc,
+		mailer:           mailer,
+		accessTTL:        accessTTL,
+		refreshTTL:       refreshTTL,
+		passwordResetTTL: passwordResetTTL,
+		frontendURL:      frontendURL,
 	}
 }
 
@@ -96,13 +114,13 @@ func generateVerificationCode() (string, error) {
 // sendVerificationCode - отправка кода верификации на email
 func (uc *auth) sendVerificationCode(emailAddr string, code string, requestID string) error {
 	log.Printf("[RequestID: %s] Sending verification code to %s", requestID, emailAddr)
-	
+
 	// Отправляем письмо с кодом верификации
 	if err := uc.mailer.SendVerificationCode(emailAddr, code); err != nil {
 		log.Printf("[RequestID: %s] Failed to send verification email: %v", requestID, err)
 		return fmt.Errorf("failed to send verification email: %w", err)
 	}
-	
+
 	log.Printf("[RequestID: %s] Verification email sent successfully to %s", requestID, emailAddr)
 	return nil
 }
@@ -170,6 +188,12 @@ func (uc *auth) ResendVerificationEmail(userID string, requestID string) error {
 
 	log.Printf("[RequestID: %s] ResendVerificationEmail request for userID: %s", requestID, userID)
 
+	// Проверяем, что requestID равен userID
+	if requestID != userID {
+		log.Printf("[RequestID: %s] Invalid requestID: must be equal to userID %s", requestID, userID)
+		return ErrInvalidRequestID
+	}
+
 	// Проверяем, существует ли пользователь по ID
 	curUser, err := uc.userRepo.GetUserById(ctx, userID)
 	if err != nil || curUser == nil {
@@ -216,6 +240,12 @@ func (uc *auth) VerifyEmail(userID string, requestID string, code string) error 
 
 	log.Printf("[RequestID: %s] VerifyEmail request for userID: %s", requestID, userID)
 
+	// Проверяем, что requestID равен userID
+	if requestID != userID {
+		log.Printf("[RequestID: %s] Invalid requestID: must be equal to userID %s", requestID, userID)
+		return ErrInvalidRequestID
+	}
+
 	// Проверяем, существует ли пользователь по ID
 	curUser, err := uc.userRepo.GetUserById(ctx, userID)
 	if err != nil || curUser == nil {
@@ -253,6 +283,98 @@ func (uc *auth) VerifyEmail(userID string, requestID string, code string) error 
 	uc.tokenRepo.DeleteVerificationCode(ctx, userID)
 
 	log.Printf("[RequestID: %s] Email verified successfully for user: %s", requestID, userID)
+	return nil
+}
+
+// RestorePasswordBegin - начало восстановления пароля
+func (uc *auth) RestorePasswordBegin(emailAddr string) error {
+	ctx := context.Background()
+
+	log.Printf("RestorePasswordBegin request for email: %s", emailAddr)
+
+	// Проверяем, существует ли пользователь
+	curUser, err := uc.userRepo.GetUserByEmail(ctx, emailAddr)
+	if err != nil || curUser == nil {
+		// Для безопасности не раскрываем, существует ли пользователь
+		log.Printf("User not found for password reset: %s (returning success anyway)", emailAddr)
+		return nil // Возвращаем успех, чтобы не раскрывать информацию
+	}
+
+	// Генерируем уникальный requestID для сброса пароля
+	requestID := uuid.New().String()
+
+	// Сохраняем requestID в Redis
+	err = uc.tokenRepo.StorePasswordResetRequest(ctx, curUser.ID, requestID, uc.passwordResetTTL)
+	if err != nil {
+		log.Printf("Failed to store password reset request: %v", err)
+		return fmt.Errorf("failed to store password reset request: %w", err)
+	}
+
+	log.Printf("Password reset requestID generated for user %s: %s", curUser.ID, requestID)
+
+	// Отправляем email со ссылкой для сброса пароля
+	err = uc.mailer.SendPasswordReset(emailAddr, curUser.ID, requestID, uc.frontendURL)
+	if err != nil {
+		log.Printf("Failed to send password reset email: %v", err)
+		return fmt.Errorf("failed to send password reset email: %w", err)
+	}
+
+	log.Printf("Password reset email sent to: %s", emailAddr)
+	return nil
+}
+
+// RestorePasswordComplete - завершение восстановления пароля
+func (uc *auth) RestorePasswordComplete(userID string, requestID string, newPassword string) error {
+	ctx := context.Background()
+
+	log.Printf("[RequestID: %s] RestorePasswordComplete request for userID: %s", requestID, userID)
+
+	// Проверка длины пароля
+	if len(newPassword) < 6 || len(newPassword) > 128 {
+		return ErrMinLengthPswd
+	}
+
+	// Проверяем, существует ли пользователь
+	curUser, err := uc.userRepo.GetUserById(ctx, userID)
+	if err != nil || curUser == nil {
+		log.Printf("[RequestID: %s] User not found: %s", requestID, userID)
+		return ErrUserNotFound
+	}
+
+	// Проверяем requestID в Redis
+	storedRequestID, err := uc.tokenRepo.GetPasswordResetRequest(ctx, userID)
+	if err != nil {
+		log.Printf("[RequestID: %s] Failed to get password reset request: %v", requestID, err)
+		return fmt.Errorf("failed to get password reset request: %w", err)
+	}
+
+	// Проверяем, что requestID совпадает
+	if storedRequestID == "" || storedRequestID != requestID {
+		log.Printf("[RequestID: %s] Invalid password reset token for user %s", requestID, userID)
+		return ErrInvalidPasswordResetToken
+	}
+
+	// Хэшируем новый пароль
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		log.Printf("[RequestID: %s] Failed to hash password: %v", requestID, err)
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	// Обновляем пароль в базе данных
+	err = uc.userRepo.UpdatePassword(ctx, userID, string(hashedPassword))
+	if err != nil {
+		log.Printf("[RequestID: %s] Failed to update password: %v", requestID, err)
+		return fmt.Errorf("failed to update password: %w", err)
+	}
+
+	// Удаляем использованный requestID из Redis
+	uc.tokenRepo.DeletePasswordResetRequest(ctx, userID)
+
+	// Отзываем все существующие токены пользователя (для безопасности)
+	uc.tokenRepo.RevokeAllUserTokens(ctx, userID)
+
+	log.Printf("[RequestID: %s] Password reset successfully for user: %s", requestID, userID)
 	return nil
 }
 

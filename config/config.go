@@ -11,22 +11,23 @@ import (
 type (
 	// Config - структура конфига проекта
 	Config struct {
-		App          AppConfig          `yaml:"app"`          // Инфа о приложении
-		GRPC         GRPCConfig         `yaml:"grpc"`         // Инфа по gRPC сервера
-		HTTP         HTTPConfig         `yaml:"http"`         // Инфа по HTTP Gateway
-		Log          LogConfig          `yaml:"logger"`       // Уровень логгирования
-		Token        TokenConfig        `yaml:"token"`        // Инфа по токену
-		Migrations   MigrationsConfig   `yaml:"migrations"`   // Путь к миграциям
-		Database     DatabaseConfig     `yaml:"database"`     // Настройки БД из yaml
-		PG           PGConfig           // Данные по Postgres из env
-		Redis        RedisConfig        `yaml:"redis"`        // Данные по Redis
-		SMTP         SMTPConfig         `yaml:"smtp"`         // Настройки SMTP
-		Verification VerificationConfig `yaml:"verification"` // Настройки верификации email
-		Security     SecurityConfig     `yaml:"security"`     // Настройки безопасности
-		RateLimit    RateLimitConfig    `yaml:"rateLimit"`    // Настройки rate limiting
-		CORS         CORSConfig         `yaml:"cors"`         // Настройки CORS
-		Health       HealthConfig       `yaml:"health"`       // Настройки health check
-		Metrics      MetricsConfig      `yaml:"metrics"`      // Настройки метрик
+		App           AppConfig           `yaml:"app"`           // Инфа о приложении
+		GRPC          GRPCConfig          `yaml:"grpc"`          // Инфа по gRPC сервера
+		HTTP          HTTPConfig          `yaml:"http"`          // Инфа по HTTP Gateway
+		Log           LogConfig           `yaml:"logger"`        // Уровень логгирования
+		Token         TokenConfig         `yaml:"token"`         // Инфа по токену
+		Migrations    MigrationsConfig    `yaml:"migrations"`    // Путь к миграциям
+		Database      DatabaseConfig      `yaml:"database"`      // Настройки БД из yaml
+		PG            PGConfig            // Данные по Postgres из env
+		Redis         RedisConfig         `yaml:"redis"`         // Данные по Redis
+		SMTP          SMTPConfig          `yaml:"smtp"`          // Настройки SMTP
+		Verification  VerificationConfig  `yaml:"verification"`  // Настройки верификации email
+		PasswordReset PasswordResetConfig `yaml:"passwordReset"` // Настройки восстановления пароля
+		Security      SecurityConfig      `yaml:"security"`      // Настройки безопасности
+		RateLimit     RateLimitConfig     `yaml:"rateLimit"`     // Настройки rate limiting
+		CORS          CORSConfig          `yaml:"cors"`          // Настройки CORS
+		Health        HealthConfig        `yaml:"health"`        // Настройки health check
+		Metrics       MetricsConfig       `yaml:"metrics"`       // Настройки метрик
 	}
 
 	// AppConfig - структура конфига приложения
@@ -134,6 +135,12 @@ type (
 		MaxAttempts    int           `yaml:"maxAttempts"`
 		ResendCooldown time.Duration `yaml:"resendCooldown"`
 		LinkBaseURL    string        `yaml:"linkBaseURL" env:"VERIFICATION_BASE_URL"`
+	}
+
+	// PasswordResetConfig - структура конфига восстановления пароля
+	PasswordResetConfig struct {
+		TokenTTL    time.Duration `yaml:"tokenTTL"`
+		FrontendURL string        `yaml:"frontendURL" env:"PASSWORD_RESET_FRONTEND_URL"`
 	}
 
 	// SecurityConfig - структура конфига безопасности

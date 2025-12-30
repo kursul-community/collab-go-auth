@@ -51,6 +51,22 @@ service Auth {
       body: "*"
     };
   }
+  
+  // Начало восстановления пароля
+  rpc RestorePasswordBegin(RestorePasswordBeginRequest) returns (RestorePasswordBeginResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/restore-password/begin"
+      body: "*"
+    };
+  }
+  
+  // Завершение восстановления пароля
+  rpc RestorePasswordComplete(RestorePasswordCompleteRequest) returns (RestorePasswordCompleteResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/restore-password/complete"
+      body: "*"
+    };
+  }
 }
 
 message RegisterRequest {
@@ -106,5 +122,27 @@ message VerifyEmailRequest {
 }
 
 message VerifyEmailResponse {
+  // Пустой ответ при успехе
+}
+
+// === Восстановление пароля ===
+
+// Запрос на начало восстановления пароля
+message RestorePasswordBeginRequest {
+  string email = 1; // Email пользователя
+}
+
+message RestorePasswordBeginResponse {
+  // Пустой ответ при успехе
+}
+
+// Запрос на завершение восстановления пароля
+message RestorePasswordCompleteRequest {
+  string user_id = 1;    // UUID пользователя
+  string request_id = 2; // UUID запроса восстановления
+  string password = 3;   // Новый пароль
+}
+
+message RestorePasswordCompleteResponse {
   // Пустой ответ при успехе
 }
