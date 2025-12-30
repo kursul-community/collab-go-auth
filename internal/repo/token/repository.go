@@ -10,12 +10,13 @@ import (
 
 // Префиксы ключей в Redis
 const (
-	accessTokenPrefix        = "access_token:"        // Префикс для активных access токенов
-	refreshTokenPrefix       = "refresh_token:"       // Префикс для refresh токенов
-	userSessionsPrefix       = "user_sessions:"       // Префикс для списка сессий пользователя
-	userAccessTokens         = "user_access:"         // Префикс для списка access токенов пользователя
-	emailVerificationPrefix  = "email_verification:"  // Префикс для кодов верификации email
-	passwordResetPrefix      = "password_reset:"      // Префикс для запросов сброса пароля
+	accessTokenPrefix             = "access_token:"             // Префикс для активных access токенов
+	refreshTokenPrefix            = "refresh_token:"            // Префикс для refresh токенов
+	userSessionsPrefix            = "user_sessions:"            // Префикс для списка сессий пользователя
+	userAccessTokens              = "user_access:"              // Префикс для списка access токенов пользователя
+	emailVerificationPrefix       = "email_verification:"       // Префикс для кодов верификации email
+	emailVerificationRequestPrefix = "email_verification_req:"  // Префикс для requestId верификации email
+	passwordResetPrefix           = "password_reset:"           // Префикс для запросов сброса пароля
 )
 
 // Убедимся, что repository реализует интерфейс Repository
@@ -52,6 +53,12 @@ type Repository interface {
 	GetVerificationCode(ctx context.Context, email string) (string, error)
 	// DeleteVerificationCode - удаление кода верификации email
 	DeleteVerificationCode(ctx context.Context, email string) error
+	// StoreEmailVerificationRequest - сохранение requestId для верификации email
+	StoreEmailVerificationRequest(ctx context.Context, userID string, requestID string, ttl time.Duration) error
+	// GetEmailVerificationRequest - получение requestId для верификации email
+	GetEmailVerificationRequest(ctx context.Context, userID string) (string, error)
+	// DeleteEmailVerificationRequest - удаление requestId верификации email
+	DeleteEmailVerificationRequest(ctx context.Context, userID string) error
 
 	// === Восстановление пароля ===
 	// StorePasswordResetRequest - сохранение запроса на сброс пароля (userID -> requestID)
@@ -255,6 +262,39 @@ func (r *repository) DeleteVerificationCode(ctx context.Context, email string) e
 	err := r.client.Del(ctx, key).Err()
 	if err != nil {
 		return fmt.Errorf("failed to delete verification code: %w", err)
+	}
+	return nil
+}
+
+// StoreEmailVerificationRequest - сохранение requestId для верификации email в Redis
+func (r *repository) StoreEmailVerificationRequest(ctx context.Context, userID string, requestID string, ttl time.Duration) error {
+	key := emailVerificationRequestPrefix + userID
+	err := r.client.Set(ctx, key, requestID, ttl).Err()
+	if err != nil {
+		return fmt.Errorf("failed to store email verification request: %w", err)
+	}
+	return nil
+}
+
+// GetEmailVerificationRequest - получение requestId для верификации email из Redis
+func (r *repository) GetEmailVerificationRequest(ctx context.Context, userID string) (string, error) {
+	key := emailVerificationRequestPrefix + userID
+	requestID, err := r.client.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return "", nil // Запрос не найден
+	}
+	if err != nil {
+		return "", fmt.Errorf("failed to get email verification request: %w", err)
+	}
+	return requestID, nil
+}
+
+// DeleteEmailVerificationRequest - удаление requestId верификации email из Redis
+func (r *repository) DeleteEmailVerificationRequest(ctx context.Context, userID string) error {
+	key := emailVerificationRequestPrefix + userID
+	err := r.client.Del(ctx, key).Err()
+	if err != nil {
+		return fmt.Errorf("failed to delete email verification request: %w", err)
 	}
 	return nil
 }

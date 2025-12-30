@@ -75,7 +75,8 @@ message RegisterRequest {
 }
 
 message RegisterResponse {
-  string user_id = 1; // UUID пользователя
+  string user_id = 1;    // UUID пользователя
+  string request_id = 2; // UUID запроса для верификации email
 }
 
 message LoginRequest {

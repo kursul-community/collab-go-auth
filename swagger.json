@@ -406,11 +406,18 @@
       },
       "RegisterResponse": {
         "type": "object",
-        "required": ["user_id"],
+        "description": "Ответ при успешной регистрации. Содержит userId и requestId для верификации email",
+        "required": ["user_id", "request_id"],
         "properties": {
           "user_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "UUID созданного пользователя"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID запроса для верификации email (используйте для verify-email и resend-email)"
           }
         }
       },
@@ -477,40 +484,40 @@
       },
       "ResendVerificationEmailRequest": {
         "type": "object",
-        "description": "ВАЖНО: requestId должен быть равен userId",
-        "required": ["userId", "requestId"],
+        "description": "Запрос на повторную отправку кода. requestId получен при регистрации в RegisterResponse",
+        "required": ["user_id", "request_id"],
         "properties": {
-          "userId": {
+          "user_id": {
             "type": "string",
             "format": "uuid",
-            "description": "UUID пользователя"
+            "description": "UUID пользователя (из ответа /auth/register)"
           },
-          "requestId": {
+          "request_id": {
             "type": "string",
             "format": "uuid",
-            "description": "UUID запроса (должен быть равен userId)"
+            "description": "UUID запроса верификации (из ответа /auth/register)"
           }
         }
       },
       "VerifyEmailRequest": {
         "type": "object",
-        "description": "ВАЖНО: requestId должен быть равен userId",
-        "required": ["userId", "requestId", "code"],
+        "description": "Верификация email. requestId получен при регистрации в RegisterResponse",
+        "required": ["user_id", "request_id", "code"],
         "properties": {
-          "userId": {
+          "user_id": {
             "type": "string",
             "format": "uuid",
-            "description": "UUID пользователя"
+            "description": "UUID пользователя (из ответа /auth/register)"
           },
-          "requestId": {
+          "request_id": {
             "type": "string",
             "format": "uuid",
-            "description": "UUID запроса (должен быть равен userId)"
+            "description": "UUID запроса верификации (из ответа /auth/register)"
           },
           "code": {
             "type": "string",
             "pattern": "^[0-9]{6}$",
-            "description": "6-значный код верификации"
+            "description": "6-значный код верификации (из email)"
           }
         }
       },

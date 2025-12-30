@@ -36,7 +36,7 @@ var (
 	ErrUserNotFound              = errors.New("user not found")
 	ErrEmailAlreadyVerified      = errors.New("email already verified")
 	ErrInvalidVerificationCode   = errors.New("invalid or expired verification code")
-	ErrInvalidRequestID          = errors.New("requestId must be equal to userId")
+	ErrInvalidRequestID          = errors.New("invalid or expired requestId")
 	ErrInvalidPasswordResetToken = errors.New("invalid or expired password reset token")
 )
 
@@ -44,8 +44,8 @@ var _ AuthUseCase = (*auth)(nil)
 
 // AuthUseCase - интерфейс для аутентификации
 type AuthUseCase interface {
-	// Register - регистрация нового пользователя
-	Register(email string, password string) (userId string, err error)
+	// Register - регистрация нового пользователя (возвращает userId и requestId для верификации)
+	Register(email string, password string) (userId string, requestId string, err error)
 	// Login - авторизация пользователя
 	Login(email string, password string) (accessToken, refreshToken string, err error)
 	// RefreshToken - обновление токена
@@ -126,24 +126,24 @@ func (uc *auth) sendVerificationCode(emailAddr string, code string, requestID st
 }
 
 // Register - регистрация нового пользователя
-func (uc *auth) Register(email string, password string) (string, error) {
+func (uc *auth) Register(email string, password string) (string, string, error) {
 	ctx := context.Background()
 
 	// Проверка сложности и длины пароля
 	if len(password) < 6 || len(password) > 128 {
-		return "", ErrMinLengthPswd
+		return "", "", ErrMinLengthPswd
 	}
 
 	// Проверяем, что пользователя с таким email не существует
 	existingUser, err := uc.userRepo.GetUserByEmail(ctx, email)
 	if err == nil && existingUser != nil {
-		return "", ErrExistingUser
+		return "", "", ErrExistingUser
 	}
 
 	// Хэшируем пароль
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	// Генерация ID пользователя
@@ -161,25 +161,35 @@ func (uc *auth) Register(email string, password string) (string, error) {
 
 	createdID, err := uc.userRepo.CreateUser(ctx, newUser)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	// Генерируем и отправляем код верификации
+	// Генерируем случайный requestID для верификации email
+	requestID := uuid.New().String()
+
+	// Генерируем код верификации
 	code, err := generateVerificationCode()
 	if err != nil {
-		return createdID, nil // Пользователь создан, но код не отправлен
+		return createdID, requestID, nil // Пользователь создан, но код не отправлен
 	}
 
 	// Сохраняем код в Redis по userID
 	err = uc.tokenRepo.StoreVerificationCode(ctx, createdID, code, VerificationCodeTTL)
 	if err != nil {
-		return createdID, nil // Пользователь создан, но код не сохранен
+		return createdID, requestID, nil // Пользователь создан, но код не сохранен
 	}
 
-	// Отправляем код на email (при регистрации requestID не используется)
-	uc.sendVerificationCode(email, code, "")
+	// Сохраняем requestID в Redis для валидации при верификации
+	err = uc.tokenRepo.StoreEmailVerificationRequest(ctx, createdID, requestID, VerificationCodeTTL)
+	if err != nil {
+		log.Printf("Failed to store email verification request: %v", err)
+	}
 
-	return createdID, nil
+	// Отправляем код на email
+	uc.sendVerificationCode(email, code, requestID)
+
+	log.Printf("User registered: %s, requestID: %s", createdID, requestID)
+	return createdID, requestID, nil
 }
 
 // ResendVerificationEmail - повторная отправка кода верификации email
@@ -187,12 +197,6 @@ func (uc *auth) ResendVerificationEmail(userID string, requestID string) error {
 	ctx := context.Background()
 
 	log.Printf("[RequestID: %s] ResendVerificationEmail request for userID: %s", requestID, userID)
-
-	// Проверяем, что requestID равен userID
-	if requestID != userID {
-		log.Printf("[RequestID: %s] Invalid requestID: must be equal to userID %s", requestID, userID)
-		return ErrInvalidRequestID
-	}
 
 	// Проверяем, существует ли пользователь по ID
 	curUser, err := uc.userRepo.GetUserById(ctx, userID)
@@ -205,6 +209,19 @@ func (uc *auth) ResendVerificationEmail(userID string, requestID string) error {
 	if curUser.EmailVerified {
 		log.Printf("[RequestID: %s] Email already verified for user: %s", requestID, userID)
 		return ErrEmailAlreadyVerified
+	}
+
+	// Проверяем requestID в Redis
+	storedRequestID, err := uc.tokenRepo.GetEmailVerificationRequest(ctx, userID)
+	if err != nil {
+		log.Printf("[RequestID: %s] Failed to get email verification request: %v", requestID, err)
+		return fmt.Errorf("failed to get email verification request: %w", err)
+	}
+
+	// Проверяем, что requestID совпадает
+	if storedRequestID == "" || storedRequestID != requestID {
+		log.Printf("[RequestID: %s] Invalid requestID for user %s (expected: %s)", requestID, userID, storedRequestID)
+		return ErrInvalidRequestID
 	}
 
 	// Генерируем новый код верификации
@@ -221,6 +238,12 @@ func (uc *auth) ResendVerificationEmail(userID string, requestID string) error {
 	if err != nil {
 		log.Printf("[RequestID: %s] Failed to store verification code: %v", requestID, err)
 		return fmt.Errorf("failed to store verification code: %w", err)
+	}
+
+	// Обновляем TTL для requestID (сбрасываем таймер)
+	err = uc.tokenRepo.StoreEmailVerificationRequest(ctx, userID, requestID, VerificationCodeTTL)
+	if err != nil {
+		log.Printf("[RequestID: %s] Failed to update email verification request TTL: %v", requestID, err)
 	}
 
 	// Отправляем код на email
@@ -240,12 +263,6 @@ func (uc *auth) VerifyEmail(userID string, requestID string, code string) error 
 
 	log.Printf("[RequestID: %s] VerifyEmail request for userID: %s", requestID, userID)
 
-	// Проверяем, что requestID равен userID
-	if requestID != userID {
-		log.Printf("[RequestID: %s] Invalid requestID: must be equal to userID %s", requestID, userID)
-		return ErrInvalidRequestID
-	}
-
 	// Проверяем, существует ли пользователь по ID
 	curUser, err := uc.userRepo.GetUserById(ctx, userID)
 	if err != nil || curUser == nil {
@@ -257,6 +274,19 @@ func (uc *auth) VerifyEmail(userID string, requestID string, code string) error 
 	if curUser.EmailVerified {
 		log.Printf("[RequestID: %s] Email already verified for user: %s", requestID, userID)
 		return ErrEmailAlreadyVerified
+	}
+
+	// Проверяем requestID в Redis
+	storedRequestID, err := uc.tokenRepo.GetEmailVerificationRequest(ctx, userID)
+	if err != nil {
+		log.Printf("[RequestID: %s] Failed to get email verification request: %v", requestID, err)
+		return fmt.Errorf("failed to get email verification request: %w", err)
+	}
+
+	// Проверяем, что requestID совпадает
+	if storedRequestID == "" || storedRequestID != requestID {
+		log.Printf("[RequestID: %s] Invalid requestID for user %s (expected: %s)", requestID, userID, storedRequestID)
+		return ErrInvalidRequestID
 	}
 
 	// Получаем код из Redis по userID
@@ -279,8 +309,9 @@ func (uc *auth) VerifyEmail(userID string, requestID string, code string) error 
 		return fmt.Errorf("failed to verify email: %w", err)
 	}
 
-	// Удаляем код из Redis
+	// Удаляем код и requestID из Redis
 	uc.tokenRepo.DeleteVerificationCode(ctx, userID)
+	uc.tokenRepo.DeleteEmailVerificationRequest(ctx, userID)
 
 	log.Printf("[RequestID: %s] Email verified successfully for user: %s", requestID, userID)
 	return nil

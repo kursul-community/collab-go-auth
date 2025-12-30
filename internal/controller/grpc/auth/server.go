@@ -42,11 +42,14 @@ func (s *AuthServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb
 		return nil, err
 	}
 
-	userID, err := s.auth.Register(req.Email, req.Password)
+	userID, requestID, err := s.auth.Register(req.Email, req.Password)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, usecase.ErrExistingUser) {
+			return nil, status.Error(codes.AlreadyExists, err.Error())
+		}
+		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &pb.RegisterResponse{UserId: userID}, nil
+	return &pb.RegisterResponse{UserId: userID, RequestId: requestID}, nil
 }
 
 // Login - авторизация пользователя
