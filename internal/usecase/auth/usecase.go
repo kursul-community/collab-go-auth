@@ -48,9 +48,9 @@ type AuthUseCase interface {
 	// ValidateToken - проверка токена
 	ValidateToken(accessToken string) (valid bool, err error)
 	// ResendVerificationEmail - повторная отправка кода верификации email
-	ResendVerificationEmail(email string, requestID string) (message string, requestIDOut string, err error)
+	ResendVerificationEmail(userID string, requestID string) error
 	// VerifyEmail - верификация email по коду
-	VerifyEmail(email string, code string, requestID string) (success bool, message string, requestIDOut string, err error)
+	VerifyEmail(userID string, requestID string, code string) error
 }
 
 // Auth - структура для аутентификации
@@ -152,8 +152,8 @@ func (uc *auth) Register(email string, password string) (string, error) {
 		return createdID, nil // Пользователь создан, но код не отправлен
 	}
 
-	// Сохраняем код в Redis
-	err = uc.tokenRepo.StoreVerificationCode(ctx, email, code, VerificationCodeTTL)
+	// Сохраняем код в Redis по userID
+	err = uc.tokenRepo.StoreVerificationCode(ctx, createdID, code, VerificationCodeTTL)
 	if err != nil {
 		return createdID, nil // Пользователь создан, но код не сохранен
 	}
@@ -165,105 +165,95 @@ func (uc *auth) Register(email string, password string) (string, error) {
 }
 
 // ResendVerificationEmail - повторная отправка кода верификации email
-func (uc *auth) ResendVerificationEmail(email string, requestID string) (string, string, error) {
+func (uc *auth) ResendVerificationEmail(userID string, requestID string) error {
 	ctx := context.Background()
 
-	// Генерируем requestID если не передан
-	if requestID == "" {
-		requestID = uuid.New().String()
-	}
+	log.Printf("[RequestID: %s] ResendVerificationEmail request for userID: %s", requestID, userID)
 
-	log.Printf("[RequestID: %s] ResendVerificationEmail request for email: %s", requestID, email)
-
-	// Проверяем, существует ли пользователь
-	curUser, err := uc.userRepo.GetUserByEmail(ctx, email)
+	// Проверяем, существует ли пользователь по ID
+	curUser, err := uc.userRepo.GetUserById(ctx, userID)
 	if err != nil || curUser == nil {
-		log.Printf("[RequestID: %s] User not found: %s", requestID, email)
-		return "", requestID, ErrUserNotFound
+		log.Printf("[RequestID: %s] User not found: %s", requestID, userID)
+		return ErrUserNotFound
 	}
 
 	// Проверяем, не подтвержден ли уже email
 	if curUser.EmailVerified {
-		log.Printf("[RequestID: %s] Email already verified: %s", requestID, email)
-		return "", requestID, ErrEmailAlreadyVerified
+		log.Printf("[RequestID: %s] Email already verified for user: %s", requestID, userID)
+		return ErrEmailAlreadyVerified
 	}
 
 	// Генерируем новый код верификации
 	code, err := generateVerificationCode()
 	if err != nil {
 		log.Printf("[RequestID: %s] Failed to generate verification code: %v", requestID, err)
-		return "", requestID, fmt.Errorf("failed to generate verification code: %w", err)
+		return fmt.Errorf("failed to generate verification code: %w", err)
 	}
 
-	log.Printf("[RequestID: %s] Generated verification code for %s", requestID, email)
+	log.Printf("[RequestID: %s] Generated verification code for user %s", requestID, userID)
 
-	// Сохраняем код в Redis (перезаписывает старый)
-	err = uc.tokenRepo.StoreVerificationCode(ctx, email, code, VerificationCodeTTL)
+	// Сохраняем код в Redis по userID (перезаписывает старый)
+	err = uc.tokenRepo.StoreVerificationCode(ctx, userID, code, VerificationCodeTTL)
 	if err != nil {
 		log.Printf("[RequestID: %s] Failed to store verification code: %v", requestID, err)
-		return "", requestID, fmt.Errorf("failed to store verification code: %w", err)
+		return fmt.Errorf("failed to store verification code: %w", err)
 	}
 
 	// Отправляем код на email
-	err = uc.sendVerificationCode(email, code, requestID)
+	err = uc.sendVerificationCode(curUser.Email, code, requestID)
 	if err != nil {
 		log.Printf("[RequestID: %s] Failed to send verification code: %v", requestID, err)
-		return "", requestID, fmt.Errorf("failed to send verification code: %w", err)
+		return fmt.Errorf("failed to send verification code: %w", err)
 	}
 
-	log.Printf("[RequestID: %s] Verification code sent successfully to %s", requestID, email)
-	return "Verification code sent successfully", requestID, nil
+	log.Printf("[RequestID: %s] Verification code sent successfully to user %s", requestID, userID)
+	return nil
 }
 
 // VerifyEmail - верификация email по коду
-func (uc *auth) VerifyEmail(email string, code string, requestID string) (bool, string, string, error) {
+func (uc *auth) VerifyEmail(userID string, requestID string, code string) error {
 	ctx := context.Background()
 
-	// Генерируем requestID если не передан
-	if requestID == "" {
-		requestID = uuid.New().String()
-	}
+	log.Printf("[RequestID: %s] VerifyEmail request for userID: %s", requestID, userID)
 
-	log.Printf("[RequestID: %s] VerifyEmail request for email: %s", requestID, email)
-
-	// Проверяем, существует ли пользователь
-	curUser, err := uc.userRepo.GetUserByEmail(ctx, email)
+	// Проверяем, существует ли пользователь по ID
+	curUser, err := uc.userRepo.GetUserById(ctx, userID)
 	if err != nil || curUser == nil {
-		log.Printf("[RequestID: %s] User not found: %s", requestID, email)
-		return false, "", requestID, ErrUserNotFound
+		log.Printf("[RequestID: %s] User not found: %s", requestID, userID)
+		return ErrUserNotFound
 	}
 
 	// Проверяем, не подтвержден ли уже email
 	if curUser.EmailVerified {
-		log.Printf("[RequestID: %s] Email already verified: %s", requestID, email)
-		return true, "Email already verified", requestID, nil
+		log.Printf("[RequestID: %s] Email already verified for user: %s", requestID, userID)
+		return ErrEmailAlreadyVerified
 	}
 
-	// Получаем код из Redis
-	storedCode, err := uc.tokenRepo.GetVerificationCode(ctx, email)
+	// Получаем код из Redis по userID
+	storedCode, err := uc.tokenRepo.GetVerificationCode(ctx, userID)
 	if err != nil {
 		log.Printf("[RequestID: %s] Failed to get verification code: %v", requestID, err)
-		return false, "", requestID, fmt.Errorf("failed to get verification code: %w", err)
+		return fmt.Errorf("failed to get verification code: %w", err)
 	}
 
 	// Проверяем код
 	if storedCode == "" || storedCode != code {
-		log.Printf("[RequestID: %s] Invalid verification code for %s", requestID, email)
-		return false, "", requestID, ErrInvalidVerificationCode
+		log.Printf("[RequestID: %s] Invalid verification code for user %s", requestID, userID)
+		return ErrInvalidVerificationCode
 	}
 
 	// Устанавливаем email_verified = true
-	err = uc.userRepo.SetEmailVerified(ctx, curUser.ID, true)
+	err = uc.userRepo.SetEmailVerified(ctx, userID, true)
 	if err != nil {
 		log.Printf("[RequestID: %s] Failed to verify email: %v", requestID, err)
-		return false, "", requestID, fmt.Errorf("failed to verify email: %w", err)
+		return fmt.Errorf("failed to verify email: %w", err)
 	}
 
 	// Удаляем код из Redis
-	uc.tokenRepo.DeleteVerificationCode(ctx, email)
+	uc.tokenRepo.DeleteVerificationCode(ctx, userID)
 
-	log.Printf("[RequestID: %s] Email verified successfully: %s", requestID, email)
-	return true, "Email verified successfully", requestID, nil
+	log.Printf("[RequestID: %s] Email verified successfully for user: %s", requestID, userID)
+	return nil
 }
 
 // Login - авторизация пользователя

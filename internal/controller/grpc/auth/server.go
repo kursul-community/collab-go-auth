@@ -83,55 +83,52 @@ func (s *AuthServer) ValidateToken(ctx context.Context, req *pb.ValidateTokenReq
 	return &pb.ValidateTokenResponse{Valid: valid}, nil
 }
 
-// EmailValidation - структура для валидации email
-type EmailValidation struct {
-	Email string `validate:"required,email"`
+// ResendVerificationEmailValidation - структура для валидации запроса повторной отправки кода
+type ResendVerificationEmailValidation struct {
+	UserID    string `validate:"required,uuid"`
+	RequestID string `validate:"required,uuid"`
 }
 
 // ResendVerificationEmail - повторная отправка кода верификации email
 func (s *AuthServer) ResendVerificationEmail(ctx context.Context, req *pb.ResendVerificationEmailRequest) (*pb.ResendVerificationEmailResponse, error) {
-	// Валидация email
-	validateReq := &EmailValidation{
-		Email: req.Email,
+	// Валидация
+	validateReq := &ResendVerificationEmailValidation{
+		UserID:    req.UserId,
+		RequestID: req.RequestId,
 	}
 	if err := validator.ValidateRequest(validateReq); err != nil {
 		return nil, err
 	}
 
-	message, requestID, err := s.auth.ResendVerificationEmail(req.Email, req.RequestId)
+	err := s.auth.ResendVerificationEmail(req.UserId, req.RequestId)
 	if err != nil {
 		return nil, err
 	}
-	return &pb.ResendVerificationEmailResponse{
-		Message:   message,
-		RequestId: requestID,
-	}, nil
+	return &pb.ResendVerificationEmailResponse{}, nil
 }
 
 // VerifyEmailValidation - структура для валидации верификации email
 type VerifyEmailValidation struct {
-	Email string `validate:"required,email"`
-	Code  string `validate:"required,len=6"`
+	UserID    string `validate:"required,uuid"`
+	RequestID string `validate:"required,uuid"`
+	Code      string `validate:"required,len=6"`
 }
 
 // VerifyEmail - верификация email по коду
 func (s *AuthServer) VerifyEmail(ctx context.Context, req *pb.VerifyEmailRequest) (*pb.VerifyEmailResponse, error) {
 	// Валидация
 	validateReq := &VerifyEmailValidation{
-		Email: req.Email,
-		Code:  req.Code,
+		UserID:    req.UserId,
+		RequestID: req.RequestId,
+		Code:      req.Code,
 	}
 	if err := validator.ValidateRequest(validateReq); err != nil {
 		return nil, err
 	}
 
-	success, message, requestID, err := s.auth.VerifyEmail(req.Email, req.Code, req.RequestId)
+	err := s.auth.VerifyEmail(req.UserId, req.RequestId, req.Code)
 	if err != nil {
 		return nil, err
 	}
-	return &pb.VerifyEmailResponse{
-		Success:   success,
-		Message:   message,
-		RequestId: requestID,
-	}, nil
+	return &pb.VerifyEmailResponse{}, nil
 }

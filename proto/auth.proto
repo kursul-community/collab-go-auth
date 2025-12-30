@@ -90,24 +90,21 @@ message ValidateTokenResponse {
 
 // Запрос на повторную отправку кода верификации
 message ResendVerificationEmailRequest {
-  string email = 1;
-  string request_id = 2; // Уникальный идентификатор запроса для отслеживания
+  string user_id = 1;    // UUID пользователя (обязательное поле)
+  string request_id = 2; // UUID запроса для отслеживания (обязательное поле)
 }
 
 message ResendVerificationEmailResponse {
-  string message = 1;
-  string request_id = 2; // Возвращаем тот же request_id
+  // Пустой ответ при успехе
 }
 
 // Запрос на верификацию email
 message VerifyEmailRequest {
-  string email = 1;
-  string code = 2;
-  string request_id = 3; // Уникальный идентификатор запроса для отслеживания
+  string user_id = 1;    // UUID пользователя (обязательное поле)
+  string request_id = 2; // UUID запроса для отслеживания (обязательное поле)
+  string code = 3;       // 6-значный код верификации (обязательное поле)
 }
 
 message VerifyEmailResponse {
-  bool success = 1;
-  string message = 2;
-  string request_id = 3; // Возвращаем тот же request_id
+  // Пустой ответ при успехе
 }
