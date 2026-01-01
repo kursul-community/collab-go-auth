@@ -210,6 +210,12 @@ oauth:
   # Время жизни state токена (защита от CSRF)
   stateTTL: "10m"
   
+  # Настройки cookies для токенов
+  cookies:
+    domain: ""              # Домен для cookies (пустой = текущий домен)
+    secure: false           # true для HTTPS в production
+    sameSite: "lax"         # strict, lax, none
+  
   providers:
     google:
       enabled: true

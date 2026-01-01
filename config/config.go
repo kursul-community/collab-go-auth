@@ -218,7 +218,15 @@ type (
 		FrontendCallbackURL string                         `yaml:"frontendCallbackURL" env:"OAUTH_FRONTEND_CALLBACK_URL"`
 		BackendBaseURL      string                         `yaml:"backendBaseURL" env:"OAUTH_BACKEND_BASE_URL"`
 		StateTTL            time.Duration                  `yaml:"stateTTL"`
+		Cookies             OAuthCookiesConfig             `yaml:"cookies"`
 		Providers           map[string]OAuthProviderConfig `yaml:"providers"`
+	}
+
+	// OAuthCookiesConfig - конфигурация cookies для OAuth токенов
+	OAuthCookiesConfig struct {
+		Domain   string `yaml:"domain" env:"OAUTH_COOKIE_DOMAIN"`
+		Secure   bool   `yaml:"secure" env:"OAUTH_COOKIE_SECURE"`
+		SameSite string `yaml:"sameSite"` // strict, lax, none
 	}
 
 	// OAuthProviderConfig - конфигурация отдельного OAuth провайдера

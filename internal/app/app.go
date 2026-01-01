@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
+	"strings"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
@@ -18,11 +20,26 @@ import (
 	redisadapter "go-auth/internal/adapter/redis"
 	"go-auth/internal/adapter/token"
 	grpcauth "go-auth/internal/controller/grpc/auth"
+	authhttp "go-auth/internal/controller/http/auth"
 	oauthhttp "go-auth/internal/controller/http/oauth"
 	tokenrepo "go-auth/internal/repo/token"
 	"go-auth/internal/repo/user"
 	usecase "go-auth/internal/usecase/auth"
 )
+
+// parseSameSite преобразует строку в http.SameSite
+func parseSameSite(s string) http.SameSite {
+	switch strings.ToLower(s) {
+	case "strict":
+		return http.SameSiteStrictMode
+	case "lax":
+		return http.SameSiteLaxMode
+	case "none":
+		return http.SameSiteNoneMode
+	default:
+		return http.SameSiteLaxMode
+	}
+}
 
 // Run - запускает приложение
 func Run(cfg *config.Config, devMode bool) {
@@ -86,12 +103,33 @@ func Run(cfg *config.Config, devMode bool) {
 		baseAuth := usecase.GetBaseAuth(authUseCase)
 		if baseAuth != nil {
 			oauthUseCase := usecase.NewOAuthUseCase(baseAuth, oauthManager, cfg.OAuth.StateTTL)
-			oauthHandler = oauthhttp.NewHandler(oauthUseCase, cfg.OAuth.FrontendCallbackURL)
+			
+			// Конфигурация cookies
+			cookieConfig := oauthhttp.CookieConfig{
+				Domain:    cfg.OAuth.Cookies.Domain,
+				Secure:    cfg.OAuth.Cookies.Secure,
+				SameSite:  parseSameSite(cfg.OAuth.Cookies.SameSite),
+				AccessTTL: cfg.Token.AccessTTL,
+			}
+			
+			oauthHandler = oauthhttp.NewHandlerWithConfig(oauthUseCase, cfg.OAuth.FrontendCallbackURL, cookieConfig)
 			logger.Printf("OAuth initialized with providers: %v", enabledProviders)
+			logger.Printf("OAuth cookies: domain=%s, secure=%v, sameSite=%s", 
+				cfg.OAuth.Cookies.Domain, cfg.OAuth.Cookies.Secure, cfg.OAuth.Cookies.SameSite)
 		}
 	} else {
 		logger.Printf("OAuth disabled (no enabled providers)")
 	}
+
+	// Создаем Auth HTTP handler для cookies-based аутентификации
+	authCookieConfig := authhttp.CookieConfig{
+		Domain:    cfg.OAuth.Cookies.Domain,
+		Secure:    cfg.OAuth.Cookies.Secure,
+		SameSite:  parseSameSite(cfg.OAuth.Cookies.SameSite),
+		AccessTTL: cfg.Token.AccessTTL,
+	}
+	authHandler := authhttp.NewHandler(authUseCase, authCookieConfig)
+	logger.Printf("Auth HTTP handler initialized (cookies-based)")
 
 	// Создаем gRPC-сервер
 	grpcServer := grpc.NewServer(
@@ -119,7 +157,7 @@ func Run(cfg *config.Config, devMode bool) {
 	}()
 
 	// Запускаем HTTP Gateway для REST API
-	if err := RunGateway(cfg, oauthHandler); err != nil {
+	if err := RunGateway(cfg, oauthHandler, authHandler); err != nil {
 		logger.Fatalf("Failed to serve HTTP Gateway: %v", err)
 	}
 }

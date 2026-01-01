@@ -109,9 +109,6 @@ func (uc *oauthUseCase) HandleCallback(providerName, code, state string) (string
 		return "", "", ErrOAuthInvalidState
 	}
 
-	// Удаляем использованный state
-	uc.tokenRepo.DeleteOAuthState(ctx, state)
-
 	// Получаем провайдера
 	provider, err := uc.oauthManager.GetProvider(providerName)
 	if err != nil {
@@ -137,6 +134,10 @@ func (uc *oauthUseCase) HandleCallback(providerName, code, state string) (string
 		return "", "", fmt.Errorf("%w: %v", ErrOAuthUserInfoFailed, err)
 	}
 	log.Printf("OAuth: successfully got user info - email: %s, id: %s", userInfo.Email, userInfo.ID)
+
+	// Удаляем использованный state ПОСЛЕ успешного обмена code на token
+	// Это позволяет повторно использовать state, если обмен не удался
+	uc.tokenRepo.DeleteOAuthState(ctx, state)
 
 	log.Printf("OAuth: got user info - email: %s, provider_id: %s", userInfo.Email, userInfo.ID)
 

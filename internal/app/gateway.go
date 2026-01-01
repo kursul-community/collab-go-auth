@@ -14,11 +14,12 @@ import (
 
 	"go-auth/config"
 	"go-auth/gen/auth"
+	authhttp "go-auth/internal/controller/http/auth"
 	oauthhttp "go-auth/internal/controller/http/oauth"
 )
 
 // RunGateway - запускает HTTP Gateway сервер для REST API
-func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
+func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler, authHandler *authhttp.Handler) error {
 	logger := log.Default()
 
 	ctx := context.Background()
@@ -44,6 +45,17 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 
 	// Создаем основной HTTP mux
 	mainMux := http.NewServeMux()
+
+	// Регистрируем Auth HTTP роуты (для cookies-based аутентификации)
+	if authHandler != nil {
+		// POST /api/v1/auth/login - login с access_token в cookie, refresh_token в JSON
+		mainMux.HandleFunc("/api/v1/auth/login", authHandler.Login)
+		// POST /api/v1/auth/refresh - обновление access_token в cookie
+		mainMux.HandleFunc("/api/v1/auth/refresh", authHandler.RefreshToken)
+		// POST /api/v1/auth/logout - очистка access_token cookie
+		mainMux.HandleFunc("/api/v1/auth/logout", authHandler.Logout)
+		logger.Printf("Auth HTTP routes registered (cookies-based)")
+	}
 
 	// Регистрируем OAuth роуты (если OAuth включен)
 	if oauthHandler != nil {

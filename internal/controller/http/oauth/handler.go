@@ -6,14 +6,24 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	usecase "go-auth/internal/usecase/auth"
 )
 
+// CookieConfig - конфигурация cookies
+type CookieConfig struct {
+	Domain    string        // Домен для cookies (пустой = текущий домен)
+	Secure    bool          // Только HTTPS
+	SameSite  http.SameSite // SameSite policy
+	AccessTTL time.Duration // TTL для access token
+}
+
 // Handler - HTTP обработчик для OAuth
 type Handler struct {
-	oauth       usecase.OAuthUseCase
-	frontendURL string // URL фронтенда для редиректов
+	oauth        usecase.OAuthUseCase
+	frontendURL  string       // URL фронтенда для редиректов
+	cookieConfig CookieConfig // Конфигурация cookies
 }
 
 // NewHandler - создает новый OAuth handler
@@ -21,6 +31,21 @@ func NewHandler(oauth usecase.OAuthUseCase, frontendURL string) *Handler {
 	return &Handler{
 		oauth:       oauth,
 		frontendURL: frontendURL,
+		cookieConfig: CookieConfig{
+			Domain:    "",                   // Пустой = текущий домен
+			Secure:    false,                // false для localhost, true для production
+			SameSite:  http.SameSiteLaxMode, // Lax для OAuth редиректов
+			AccessTTL: 30 * time.Minute,     // 30 минут
+		},
+	}
+}
+
+// NewHandlerWithConfig - создает OAuth handler с кастомной конфигурацией cookies
+func NewHandlerWithConfig(oauth usecase.OAuthUseCase, frontendURL string, cookieConfig CookieConfig) *Handler {
+	return &Handler{
+		oauth:        oauth,
+		frontendURL:  frontendURL,
+		cookieConfig: cookieConfig,
 	}
 }
 
@@ -92,8 +117,11 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Редиректим на фронтенд с токенами
-	redirectWithTokens(w, r, h.frontendURL, accessToken, refreshToken)
+	// Устанавливаем access_token в HTTP-only cookie
+	h.setAccessTokenCookie(w, accessToken)
+	
+	// Редиректим на фронтенд с refresh_token в URL
+	redirectWithRefreshToken(w, r, h.frontendURL, refreshToken)
 }
 
 // GetProviders обрабатывает GET /api/v1/auth/oauth/providers
@@ -132,8 +160,46 @@ func extractProviderFromCallback(path string) string {
 	return path
 }
 
-// redirectWithTokens редиректит на фронтенд с токенами в URL
-func redirectWithTokens(w http.ResponseWriter, r *http.Request, frontendURL, accessToken, refreshToken string) {
+// setAccessTokenCookie устанавливает access_token в HTTP-only cookie
+func (h *Handler) setAccessTokenCookie(w http.ResponseWriter, accessToken string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "access_token",
+		Value:    accessToken,
+		Path:     "/",
+		Domain:   h.cookieConfig.Domain,
+		MaxAge:   int(h.cookieConfig.AccessTTL.Seconds()),
+		HttpOnly: true,
+		Secure:   h.cookieConfig.Secure,
+		SameSite: h.cookieConfig.SameSite,
+	})
+}
+
+// SetAccessTokenCookie - публичный метод для установки access_token cookie
+func (h *Handler) SetAccessTokenCookie(w http.ResponseWriter, accessToken string) {
+	h.setAccessTokenCookie(w, accessToken)
+}
+
+// ClearAccessTokenCookie очищает access_token из cookies (для logout)
+func (h *Handler) ClearAccessTokenCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "access_token",
+		Value:    "",
+		Path:     "/",
+		Domain:   h.cookieConfig.Domain,
+		MaxAge:   -1, // Удаляет cookie
+		HttpOnly: true,
+		Secure:   h.cookieConfig.Secure,
+		SameSite: h.cookieConfig.SameSite,
+	})
+}
+
+// GetCookieConfig возвращает конфигурацию cookies
+func (h *Handler) GetCookieConfig() CookieConfig {
+	return h.cookieConfig
+}
+
+// redirectWithRefreshToken редиректит на фронтенд с refresh_token в URL
+func redirectWithRefreshToken(w http.ResponseWriter, r *http.Request, frontendURL, refreshToken string) {
 	u, err := url.Parse(frontendURL)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "invalid frontend URL")
@@ -141,11 +207,10 @@ func redirectWithTokens(w http.ResponseWriter, r *http.Request, frontendURL, acc
 	}
 
 	q := u.Query()
-	q.Set("access_token", accessToken)
 	q.Set("refresh_token", refreshToken)
 	u.RawQuery = q.Encode()
 
-	log.Printf("OAuth: Redirecting to frontend with tokens")
+	log.Printf("OAuth: Redirecting to frontend with access_token in cookie, refresh_token in URL")
 	http.Redirect(w, r, u.String(), http.StatusFound)
 }
 
