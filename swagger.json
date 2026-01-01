@@ -2,37 +2,35 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Go Auth API",
-    "description": "Public Go Auth API for authentication and authorization",
-    "license": {
-      "name": ""
-    },
+    "description": "API аутентификации и авторизации пользователей с поддержкой OAuth2",
     "version": "1.0.0"
   },
   "servers": [
     {
       "url": "/api/v1",
-      "description": "API for current URL"
+      "description": "API server"
     }
   ],
   "paths": {
     "/auth/register": {
       "post": {
         "tags": ["Auth"],
-        "description": "Register a new user",
+        "summary": "Регистрация пользователя",
+        "description": "Создает нового пользователя и отправляет код верификации на email. Возвращает user_id и request_id для последующей верификации.",
         "operationId": "register",
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/RegisterRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
-            "description": "User registered successfully",
+            "description": "Пользователь успешно зарегистрирован",
             "content": {
               "application/json": {
                 "schema": {
@@ -41,8 +39,8 @@
               }
             }
           },
-          "409": {
-            "description": "User with specified email already exists",
+          "400": {
+            "description": "Некорректные данные запроса",
             "content": {
               "application/json": {
                 "schema": {
@@ -51,8 +49,8 @@
               }
             }
           },
-          "400": {
-            "description": "Invalid request data",
+          "409": {
+            "description": "Пользователь с таким email уже существует",
             "content": {
               "application/json": {
                 "schema": {
@@ -67,21 +65,22 @@
     "/auth/login": {
       "post": {
         "tags": ["Auth"],
-        "description": "Login user",
+        "summary": "Вход в систему",
+        "description": "Аутентификация пользователя по email и паролю. Возвращает access и refresh токены.",
         "operationId": "login",
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/LoginRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
-            "description": "Logged in successfully",
+            "description": "Успешная аутентификация",
             "content": {
               "application/json": {
                 "schema": {
@@ -90,8 +89,8 @@
               }
             }
           },
-          "401": {
-            "description": "Invalid credentials",
+          "400": {
+            "description": "Некорректные данные запроса",
             "content": {
               "application/json": {
                 "schema": {
@@ -100,8 +99,8 @@
               }
             }
           },
-          "400": {
-            "description": "Invalid request data",
+          "401": {
+            "description": "Неверные учетные данные",
             "content": {
               "application/json": {
                 "schema": {
@@ -116,21 +115,22 @@
     "/auth/refresh": {
       "post": {
         "tags": ["Auth"],
-        "description": "Refresh access token",
+        "summary": "Обновление access токена",
+        "description": "Получение нового access токена по refresh токену",
         "operationId": "refreshToken",
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/RefreshTokenRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
-            "description": "Token refreshed successfully",
+            "description": "Токен успешно обновлен",
             "content": {
               "application/json": {
                 "schema": {
@@ -140,7 +140,7 @@
             }
           },
           "401": {
-            "description": "Invalid or expired refresh token",
+            "description": "Невалидный или истекший refresh токен",
             "content": {
               "application/json": {
                 "schema": {
@@ -155,21 +155,22 @@
     "/auth/validate": {
       "post": {
         "tags": ["Auth"],
-        "description": "Validate access token",
+        "summary": "Проверка access токена",
+        "description": "Проверяет валидность access токена",
         "operationId": "validateToken",
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ValidateTokenRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
-            "description": "Token validation result",
+            "description": "Результат проверки токена",
             "content": {
               "application/json": {
                 "schema": {
@@ -177,9 +178,49 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/auth/sign-up/verify-email": {
+      "post": {
+        "tags": ["Email Verification"],
+        "summary": "Верификация email",
+        "description": "Подтверждение email по 6-значному коду. Используйте user_id и request_id из ответа /auth/register",
+        "operationId": "verifyEmail",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyEmailRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Email успешно подтвержден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmptyResponse"
+                }
+              }
+            }
           },
-          "401": {
-            "description": "Invalid token",
+          "400": {
+            "description": "Неверный код верификации или невалидный request_id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Пользователь не найден",
             "content": {
               "application/json": {
                 "schema": {
@@ -193,71 +234,23 @@
     },
     "/auth/sign-up/resend-email": {
       "post": {
-        "tags": ["Auth"],
-        "description": "Resend verification email code",
+        "tags": ["Email Verification"],
+        "summary": "Повторная отправка кода верификации",
+        "description": "Отправляет новый код верификации на email. Используйте user_id и request_id из ответа /auth/register",
         "operationId": "resendVerificationEmail",
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ResendVerificationEmailRequest"
               }
             }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Verification email sent successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EmptyResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request data",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "User not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
           }
-        }
-      }
-    },
-    "/auth/sign-up/verify-email": {
-      "post": {
-        "tags": ["Auth"],
-        "description": "Verify email with code",
-        "operationId": "verifyEmail",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VerifyEmailRequest"
-              }
-            }
-          },
-          "required": true
         },
         "responses": {
           "200": {
-            "description": "Email verified successfully",
+            "description": "Код успешно отправлен",
             "content": {
               "application/json": {
                 "schema": {
@@ -267,7 +260,7 @@
             }
           },
           "400": {
-            "description": "Invalid or expired verification code",
+            "description": "Невалидный request_id или email уже подтвержден",
             "content": {
               "application/json": {
                 "schema": {
@@ -277,7 +270,7 @@
             }
           },
           "404": {
-            "description": "User not found",
+            "description": "Пользователь не найден",
             "content": {
               "application/json": {
                 "schema": {
@@ -291,22 +284,23 @@
     },
     "/auth/restore-password/begin": {
       "post": {
-        "tags": ["Auth"],
-        "description": "Begin password restore pipeline. Sends email with reset link.",
+        "tags": ["Password Recovery"],
+        "summary": "Начало восстановления пароля",
+        "description": "Отправляет письмо со ссылкой для сброса пароля на указанный email",
         "operationId": "restorePasswordBegin",
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/RestorePasswordBeginRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
-            "description": "Restore password email sent successfully",
+            "description": "Письмо отправлено (даже если пользователь не существует - для безопасности)",
             "content": {
               "application/json": {
                 "schema": {
@@ -316,7 +310,7 @@
             }
           },
           "400": {
-            "description": "Invalid request data",
+            "description": "Некорректный email",
             "content": {
               "application/json": {
                 "schema": {
@@ -330,22 +324,23 @@
     },
     "/auth/restore-password/complete": {
       "post": {
-        "tags": ["Auth"],
-        "description": "Complete password restore pipeline and change password",
+        "tags": ["Password Recovery"],
+        "summary": "Завершение восстановления пароля",
+        "description": "Устанавливает новый пароль. user_id и request_id берутся из ссылки в email",
         "operationId": "restorePasswordComplete",
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/RestorePasswordCompleteRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
-            "description": "Password changed successfully",
+            "description": "Пароль успешно изменен",
             "content": {
               "application/json": {
                 "schema": {
@@ -355,7 +350,7 @@
             }
           },
           "400": {
-            "description": "Invalid or expired password reset token",
+            "description": "Невалидный или истекший токен сброса пароля",
             "content": {
               "application/json": {
                 "schema": {
@@ -365,11 +360,172 @@
             }
           },
           "404": {
-            "description": "User not found",
+            "description": "Пользователь не найден",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/oauth/{provider}": {
+      "get": {
+        "tags": ["OAuth2"],
+        "summary": "ШАГ 2-3: Получить URL авторизации провайдера",
+        "description": "**Что происходит:**\n1. Client запрашивает ссылку для авторизации через провайдера\n2. Auth Server генерирует URL с параметрами (client_id, redirect_uri, scope, state)\n3. Auth Server возвращает URL для перенаправления пользователя\n\n**State** - случайная строка для защиты от CSRF атак",
+        "operationId": "oauthGetAuthUrl",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "description": "Провайдер OAuth2",
+            "schema": {
+              "$ref": "#/components/schemas/OAuthProvider"
+            }
+          },
+          {
+            "name": "redirect_uri",
+            "in": "query",
+            "required": false,
+            "description": "URL для возврата после авторизации (по умолчанию из конфига)",
+            "schema": {
+              "type": "string",
+              "format": "uri",
+              "example": "http://localhost:5173/auth/callback"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "URL для перенаправления пользователя на страницу провайдера",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthAuthUrlResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Неподдерживаемый провайдер",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/oauth/{provider}/callback": {
+      "get": {
+        "tags": ["OAuth2"],
+        "summary": "ШАГ 9-13: Callback после авторизации у провайдера",
+        "description": "**Что происходит:**\n1. Пользователь подтвердил доступ у провайдера (Google/GitHub/etc)\n2. Провайдер редиректит сюда с authorization code\n3. Auth Server обменивает code на access_token провайдера\n4. Auth Server получает данные пользователя (email, name) от провайдера\n5. Auth Server создаёт/находит пользователя в БД\n6. Auth Server генерирует свои JWT токены\n7. Возвращает токены клиенту\n\n**Важно:** Этот endpoint вызывается автоматически провайдером!",
+        "operationId": "oauthCallback",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "description": "Провайдер OAuth2",
+            "schema": {
+              "$ref": "#/components/schemas/OAuthProvider"
+            }
+          },
+          {
+            "name": "code",
+            "in": "query",
+            "required": true,
+            "description": "Authorization code от провайдера (одноразовый, живёт ~10 минут)",
+            "schema": {
+              "type": "string",
+              "example": "4/0AX4XfWh..."
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": true,
+            "description": "State для защиты от CSRF (должен совпадать с отправленным)",
+            "schema": {
+              "type": "string",
+              "example": "abc123xyz"
+            }
+          },
+          {
+            "name": "error",
+            "in": "query",
+            "required": false,
+            "description": "Код ошибки, если пользователь отклонил доступ",
+            "schema": {
+              "type": "string",
+              "example": "access_denied"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Редирект на фронтенд с токенами в URL или cookie",
+            "headers": {
+              "Location": {
+                "description": "URL фронтенда с параметрами",
+                "schema": {
+                  "type": "string",
+                  "example": "http://localhost:5173/auth/callback?access_token=...&refresh_token=..."
+                }
+              },
+              "Set-Cookie": {
+                "description": "JWT токены в httpOnly cookies (опционально)",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Невалидный code или state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Пользователь отклонил доступ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/oauth/providers": {
+      "get": {
+        "tags": ["OAuth2"],
+        "summary": "Список доступных OAuth2 провайдеров",
+        "description": "Возвращает список включённых OAuth2 провайдеров для отображения кнопок на фронтенде",
+        "operationId": "oauthListProviders",
+        "responses": {
+          "200": {
+            "description": "Список провайдеров",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthProvidersListResponse"
                 }
               }
             }
@@ -385,9 +541,14 @@
         "required": ["message"],
         "properties": {
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "Текст ошибки"
           }
         }
+      },
+      "EmptyResponse": {
+        "type": "object",
+        "description": "Пустой ответ при успехе"
       },
       "RegisterRequest": {
         "type": "object",
@@ -395,29 +556,34 @@
         "properties": {
           "email": {
             "type": "string",
-            "format": "email"
+            "format": "email",
+            "description": "Email пользователя",
+            "example": "user@example.com"
           },
           "password": {
             "type": "string",
             "minLength": 6,
-            "maxLength": 128
+            "maxLength": 128,
+            "description": "Пароль (6-128 символов)",
+            "example": "securePassword123"
           }
         }
       },
       "RegisterResponse": {
         "type": "object",
-        "description": "Ответ при успешной регистрации. Содержит userId и requestId для верификации email",
         "required": ["user_id", "request_id"],
         "properties": {
           "user_id": {
             "type": "string",
             "format": "uuid",
-            "description": "UUID созданного пользователя"
+            "description": "UUID созданного пользователя",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
           },
           "request_id": {
             "type": "string",
             "format": "uuid",
-            "description": "UUID запроса для верификации email (используйте для verify-email и resend-email)"
+            "description": "UUID запроса для верификации email (используйте для verify-email и resend-email)",
+            "example": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
           }
         }
       },
@@ -427,10 +593,14 @@
         "properties": {
           "email": {
             "type": "string",
-            "format": "email"
+            "format": "email",
+            "description": "Email пользователя",
+            "example": "user@example.com"
           },
           "password": {
-            "type": "string"
+            "type": "string",
+            "description": "Пароль",
+            "example": "securePassword123"
           }
         }
       },
@@ -439,10 +609,14 @@
         "required": ["access_token", "refresh_token"],
         "properties": {
           "access_token": {
-            "type": "string"
+            "type": "string",
+            "description": "JWT access токен для авторизации запросов",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
           },
           "refresh_token": {
-            "type": "string"
+            "type": "string",
+            "description": "JWT refresh токен для обновления access токена",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
           }
         }
       },
@@ -451,7 +625,9 @@
         "required": ["refresh_token"],
         "properties": {
           "refresh_token": {
-            "type": "string"
+            "type": "string",
+            "description": "Refresh токен",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
           }
         }
       },
@@ -460,7 +636,9 @@
         "required": ["access_token"],
         "properties": {
           "access_token": {
-            "type": "string"
+            "type": "string",
+            "description": "Новый JWT access токен",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
           }
         }
       },
@@ -469,7 +647,9 @@
         "required": ["access_token"],
         "properties": {
           "access_token": {
-            "type": "string"
+            "type": "string",
+            "description": "Access токен для проверки",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
           }
         }
       },
@@ -478,52 +658,53 @@
         "required": ["valid"],
         "properties": {
           "valid": {
-            "type": "boolean"
-          }
-        }
-      },
-      "ResendVerificationEmailRequest": {
-        "type": "object",
-        "description": "Запрос на повторную отправку кода. requestId получен при регистрации в RegisterResponse",
-        "required": ["user_id", "request_id"],
-        "properties": {
-          "user_id": {
-            "type": "string",
-            "format": "uuid",
-            "description": "UUID пользователя (из ответа /auth/register)"
-          },
-          "request_id": {
-            "type": "string",
-            "format": "uuid",
-            "description": "UUID запроса верификации (из ответа /auth/register)"
+            "type": "boolean",
+            "description": "Валиден ли токен",
+            "example": true
           }
         }
       },
       "VerifyEmailRequest": {
         "type": "object",
-        "description": "Верификация email. requestId получен при регистрации в RegisterResponse",
         "required": ["user_id", "request_id", "code"],
         "properties": {
           "user_id": {
             "type": "string",
             "format": "uuid",
-            "description": "UUID пользователя (из ответа /auth/register)"
+            "description": "UUID пользователя (из ответа /auth/register)",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
           },
           "request_id": {
             "type": "string",
             "format": "uuid",
-            "description": "UUID запроса верификации (из ответа /auth/register)"
+            "description": "UUID запроса верификации (из ответа /auth/register)",
+            "example": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
           },
           "code": {
             "type": "string",
             "pattern": "^[0-9]{6}$",
-            "description": "6-значный код верификации (из email)"
+            "description": "6-значный код верификации из email",
+            "example": "123456"
           }
         }
       },
-      "EmptyResponse": {
+      "ResendVerificationEmailRequest": {
         "type": "object",
-        "description": "Пустой ответ при успехе"
+        "required": ["user_id", "request_id"],
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID пользователя (из ответа /auth/register)",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID запроса верификации (из ответа /auth/register)",
+            "example": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+          }
+        }
       },
       "RestorePasswordBeginRequest": {
         "type": "object",
@@ -532,7 +713,8 @@
           "email": {
             "type": "string",
             "format": "email",
-            "description": "Email пользователя"
+            "description": "Email пользователя для восстановления пароля",
+            "example": "user@example.com"
           }
         }
       },
@@ -543,18 +725,118 @@
           "user_id": {
             "type": "string",
             "format": "uuid",
-            "description": "UUID пользователя (из ссылки в email)"
+            "description": "UUID пользователя (из ссылки в email)",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
           },
           "request_id": {
             "type": "string",
             "format": "uuid",
-            "description": "UUID запроса восстановления (из ссылки в email)"
+            "description": "UUID запроса восстановления (из ссылки в email)",
+            "example": "a11e1d87-ca6f-44fe-ba44-5473cd0a0dc0"
           },
           "password": {
             "type": "string",
             "minLength": 6,
             "maxLength": 128,
-            "description": "Новый пароль"
+            "description": "Новый пароль (6-128 символов)",
+            "example": "newSecurePassword123"
+          }
+        }
+      },
+      "OAuthProvider": {
+        "type": "string",
+        "enum": ["google", "github", "yandex", "vk"],
+        "description": "Поддерживаемые OAuth2 провайдеры",
+        "example": "google"
+      },
+      "OAuthAuthUrlResponse": {
+        "type": "object",
+        "required": ["auth_url", "state"],
+        "properties": {
+          "auth_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL для перенаправления пользователя на страницу провайдера",
+            "example": "https://accounts.google.com/o/oauth2/v2/auth?client_id=...&redirect_uri=...&scope=email%20profile&state=abc123&response_type=code"
+          },
+          "state": {
+            "type": "string",
+            "description": "Случайный state для CSRF защиты (сохраните и проверьте в callback)",
+            "example": "abc123xyz789"
+          }
+        }
+      },
+      "OAuthProvidersListResponse": {
+        "type": "object",
+        "required": ["providers"],
+        "properties": {
+          "providers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OAuthProviderInfo"
+            },
+            "description": "Список доступных провайдеров"
+          }
+        }
+      },
+      "OAuthProviderInfo": {
+        "type": "object",
+        "required": ["name", "enabled"],
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/OAuthProvider"
+          },
+          "display_name": {
+            "type": "string",
+            "description": "Отображаемое имя провайдера",
+            "example": "Google"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Включён ли провайдер",
+            "example": true
+          },
+          "icon_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL иконки провайдера",
+            "example": "https://example.com/icons/google.svg"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT токен в заголовке Authorization"
+      },
+      "OAuth2Google": {
+        "type": "oauth2",
+        "description": "OAuth2 авторизация через Google",
+        "flows": {
+          "authorizationCode": {
+            "authorizationUrl": "https://accounts.google.com/o/oauth2/v2/auth",
+            "tokenUrl": "https://oauth2.googleapis.com/token",
+            "scopes": {
+              "email": "Доступ к email пользователя",
+              "profile": "Доступ к профилю пользователя"
+            }
+          }
+        }
+      },
+      "OAuth2GitHub": {
+        "type": "oauth2",
+        "description": "OAuth2 авторизация через GitHub",
+        "flows": {
+          "authorizationCode": {
+            "authorizationUrl": "https://github.com/login/oauth/authorize",
+            "tokenUrl": "https://github.com/login/oauth/access_token",
+            "scopes": {
+              "user:email": "Доступ к email пользователя",
+              "read:user": "Доступ к профилю пользователя"
+            }
           }
         }
       }
@@ -563,8 +845,19 @@
   "tags": [
     {
       "name": "Auth",
-      "description": "Authentication endpoints"
+      "description": "Аутентификация и авторизация по email/password"
+    },
+    {
+      "name": "Email Verification",
+      "description": "Верификация email после регистрации"
+    },
+    {
+      "name": "Password Recovery",
+      "description": "Восстановление пароля"
+    },
+    {
+      "name": "OAuth2",
+      "description": "Авторизация через внешних провайдеров (Google, GitHub, Yandex, VK)"
     }
   ]
 }
-

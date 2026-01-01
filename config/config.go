@@ -3,6 +3,8 @@ package config
 import (
 	"fmt"
 	"log"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/ilyakaznacheev/cleanenv"
@@ -11,13 +13,13 @@ import (
 type (
 	// Config - структура конфига проекта
 	Config struct {
-		App           AppConfig           `yaml:"app"`           // Инфа о приложении
-		GRPC          GRPCConfig          `yaml:"grpc"`          // Инфа по gRPC сервера
-		HTTP          HTTPConfig          `yaml:"http"`          // Инфа по HTTP Gateway
-		Log           LogConfig           `yaml:"logger"`        // Уровень логгирования
-		Token         TokenConfig         `yaml:"token"`         // Инфа по токену
-		Migrations    MigrationsConfig    `yaml:"migrations"`    // Путь к миграциям
-		Database      DatabaseConfig      `yaml:"database"`      // Настройки БД из yaml
+		App           AppConfig           `yaml:"app"`        // Инфа о приложении
+		GRPC          GRPCConfig          `yaml:"grpc"`       // Инфа по gRPC сервера
+		HTTP          HTTPConfig          `yaml:"http"`       // Инфа по HTTP Gateway
+		Log           LogConfig           `yaml:"logger"`     // Уровень логгирования
+		Token         TokenConfig         `yaml:"token"`      // Инфа по токену
+		Migrations    MigrationsConfig    `yaml:"migrations"` // Путь к миграциям
+		Database      DatabaseConfig      `yaml:"database"`   // Настройки БД из yaml
 		PG            PGConfig            // Данные по Postgres из env
 		Redis         RedisConfig         `yaml:"redis"`         // Данные по Redis
 		SMTP          SMTPConfig          `yaml:"smtp"`          // Настройки SMTP
@@ -28,6 +30,7 @@ type (
 		CORS          CORSConfig          `yaml:"cors"`          // Настройки CORS
 		Health        HealthConfig        `yaml:"health"`        // Настройки health check
 		Metrics       MetricsConfig       `yaml:"metrics"`       // Настройки метрик
+		OAuth         OAuthConfig         `yaml:"oauth"`         // Настройки OAuth2
 	}
 
 	// AppConfig - структура конфига приложения
@@ -109,16 +112,16 @@ type (
 
 	// SMTPConfig - структура конфига SMTP
 	SMTPConfig struct {
-		Host      string            `yaml:"host" env:"SMTP_HOST" env-default:"smtp.gmail.com"`
-		Port      int               `yaml:"port" env:"SMTP_PORT" env-default:"587"`
-		Username  string            `yaml:"username" env:"SMTP_USERNAME"`
-		Password  string            `yaml:"password" env:"SMTP_PASSWORD"`
-		From      string            `yaml:"from" env:"SMTP_FROM"`
-		FromName  string            `yaml:"fromName" env:"SMTP_FROM_NAME"`
-		UseTLS    bool              `yaml:"useTLS"`
-		UseSSL    bool              `yaml:"useSSL"`
-		Timeout   time.Duration     `yaml:"timeout"`
-		Templates SMTPTemplates     `yaml:"templates"`
+		Host      string        `yaml:"host" env:"SMTP_HOST" env-default:"smtp.gmail.com"`
+		Port      int           `yaml:"port" env:"SMTP_PORT" env-default:"587"`
+		Username  string        `yaml:"username" env:"SMTP_USERNAME"`
+		Password  string        `yaml:"password" env:"SMTP_PASSWORD"`
+		From      string        `yaml:"from" env:"SMTP_FROM"`
+		FromName  string        `yaml:"fromName" env:"SMTP_FROM_NAME"`
+		UseTLS    bool          `yaml:"useTLS"`
+		UseSSL    bool          `yaml:"useSSL"`
+		Timeout   time.Duration `yaml:"timeout"`
+		Templates SMTPTemplates `yaml:"templates"`
 	}
 
 	// SMTPTemplates - шаблоны email писем
@@ -159,9 +162,9 @@ type (
 
 	// RateLimitConfig - структура конфига rate limiting
 	RateLimitConfig struct {
-		Enabled   bool                       `yaml:"enabled"`
-		Global    RateLimitGlobal            `yaml:"global"`
-		Endpoints RateLimitEndpoints         `yaml:"endpoints"`
+		Enabled   bool               `yaml:"enabled"`
+		Global    RateLimitGlobal    `yaml:"global"`
+		Endpoints RateLimitEndpoints `yaml:"endpoints"`
 	}
 
 	// RateLimitGlobal - глобальные лимиты
@@ -208,6 +211,26 @@ type (
 		Enabled bool   `yaml:"enabled"`
 		Path    string `yaml:"path"`
 		Port    int    `yaml:"port"`
+	}
+
+	// OAuthConfig - структура конфига OAuth2
+	OAuthConfig struct {
+		FrontendCallbackURL string                         `yaml:"frontendCallbackURL" env:"OAUTH_FRONTEND_CALLBACK_URL"`
+		BackendBaseURL      string                         `yaml:"backendBaseURL" env:"OAUTH_BACKEND_BASE_URL"`
+		StateTTL            time.Duration                  `yaml:"stateTTL"`
+		Providers           map[string]OAuthProviderConfig `yaml:"providers"`
+	}
+
+	// OAuthProviderConfig - конфигурация отдельного OAuth провайдера
+	OAuthProviderConfig struct {
+		Enabled      bool     `yaml:"enabled"`
+		DisplayName  string   `yaml:"displayName"`
+		ClientID     string   `yaml:"clientId" env:"OAUTH_{PROVIDER}_CLIENT_ID"`
+		ClientSecret string   `yaml:"clientSecret" env:"OAUTH_{PROVIDER}_CLIENT_SECRET"`
+		AuthURL      string   `yaml:"authURL"`
+		TokenURL     string   `yaml:"tokenURL"`
+		UserInfoURL  string   `yaml:"userInfoURL"`
+		Scopes       []string `yaml:"scopes"`
 	}
 )
 
@@ -269,5 +292,58 @@ func NewConfig() (*Config, error) {
 		return nil, err
 	}
 
+	// Загружаем OAuth credentials из переменных окружения
+	cfg.loadOAuthCredentials()
+
 	return cfg, nil
+}
+
+// loadOAuthCredentials - загрузка OAuth credentials из переменных окружения
+func (c *Config) loadOAuthCredentials() {
+	if c.OAuth.Providers == nil {
+		return
+	}
+
+	for name, provider := range c.OAuth.Providers {
+		upperName := strings.ToUpper(name)
+
+		// Загружаем ClientID
+		if clientID := os.Getenv("OAUTH_" + upperName + "_CLIENT_ID"); clientID != "" {
+			provider.ClientID = clientID
+		}
+
+		// Загружаем ClientSecret
+		if clientSecret := os.Getenv("OAUTH_" + upperName + "_CLIENT_SECRET"); clientSecret != "" {
+			provider.ClientSecret = clientSecret
+		}
+
+		// Обновляем провайдера в map
+		c.OAuth.Providers[name] = provider
+	}
+}
+
+// GetEnabledOAuthProviders - возвращает список включенных OAuth провайдеров
+func (c *Config) GetEnabledOAuthProviders() []string {
+	var enabled []string
+	for name, provider := range c.OAuth.Providers {
+		if provider.Enabled && provider.ClientID != "" && provider.ClientSecret != "" {
+			enabled = append(enabled, name)
+		}
+	}
+	return enabled
+}
+
+// GetOAuthProvider - возвращает конфигурацию провайдера по имени
+func (c *Config) GetOAuthProvider(name string) (OAuthProviderConfig, bool) {
+	provider, ok := c.OAuth.Providers[strings.ToLower(name)]
+	return provider, ok
+}
+
+// IsOAuthProviderEnabled - проверяет, включен ли провайдер
+func (c *Config) IsOAuthProviderEnabled(name string) bool {
+	provider, ok := c.OAuth.Providers[strings.ToLower(name)]
+	if !ok {
+		return false
+	}
+	return provider.Enabled && provider.ClientID != "" && provider.ClientSecret != ""
 }

@@ -74,6 +74,14 @@ type auth struct {
 	frontendURL      string        // URL фронтенда для ссылок
 }
 
+// GetBaseAuth - возвращает указатель на базовую структуру auth для использования в OAuth
+func GetBaseAuth(uc AuthUseCase) *auth {
+	if a, ok := uc.(*auth); ok {
+		return a
+	}
+	return nil
+}
+
 // NewAuthUseCase - конструктор для auth
 func NewAuthUseCase(
 	userRepo user.Repository,
