@@ -29,6 +29,7 @@ var (
 	ErrInvalidCredentials        = errors.New("invalid credentials")
 	ErrExistingUser              = errors.New("email already in use")
 	ErrUserNotActive             = errors.New("user account is not active")
+	ErrEmailNotVerified          = errors.New("email not verified")
 	ErrAccessTokenNotFound       = errors.New("access token not found or revoked")
 	ErrMinLengthPswd             = errors.New("password length must be between 6 and 128 characters")
 	ErrInvalidRefreshToken       = errors.New("invalid or expired refresh token")
@@ -427,6 +428,11 @@ func (uc *auth) Login(email string, password string) (string, string, error) {
 	// Проверяем, активен ли пользователь
 	if !curUser.IsActive {
 		return "", "", ErrUserNotActive
+	}
+
+	// Проверяем, верифицирована ли почта
+	if !curUser.EmailVerified {
+		return "", "", ErrEmailNotVerified
 	}
 
 	// Генерируем access токен

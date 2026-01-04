@@ -68,10 +68,11 @@ func TestLogin(t *testing.T) {
 		require.NoError(t, err)
 
 		mockUser := &entity.User{
-			ID:       "user-id",
-			Email:    email,
-			Password: string(hashedPassword),
-			IsActive: true,
+			ID:            "user-id",
+			Email:         email,
+			Password:      string(hashedPassword),
+			IsActive:      true,
+			EmailVerified: true,
 		}
 
 		mockUserRepo.On("GetUserByEmail", mock.Anything, email).Return(mockUser, nil)
@@ -104,16 +105,45 @@ func TestLogin(t *testing.T) {
 		require.NoError(t, err)
 
 		mockUser := &entity.User{
-			ID:       "user-id",
-			Email:    email,
-			Password: string(hashedPassword),
-			IsActive: true,
+			ID:            "user-id",
+			Email:         email,
+			Password:      string(hashedPassword),
+			IsActive:      true,
+			EmailVerified: true,
 		}
 
 		mockUserRepo.On("GetUserByEmail", mock.Anything, email).Return(mockUser, nil)
 
 		_, _, err = authUseCase.Login(email, "wrong_password")
 		require.ErrorIs(t, err, ErrInvalidCredentials)
+
+		mockUserRepo.AssertExpectations(t)
+	})
+
+	t.Run("email not verified", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		mockTokenRepo := new(MockTokenRepository)
+		mockTokenService := new(MockTokenService)
+		mockMailer := new(MockMailer)
+
+		authUseCase := NewAuthUseCase(mockUserRepo, mockTokenRepo, mockTokenService, mockMailer, testAccessTTL, testRefreshTTL)
+
+		// Генерация хэша пароля
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		require.NoError(t, err)
+
+		mockUser := &entity.User{
+			ID:            "user-id",
+			Email:         email,
+			Password:      string(hashedPassword),
+			IsActive:      true,
+			EmailVerified: false, // Email не верифицирован
+		}
+
+		mockUserRepo.On("GetUserByEmail", mock.Anything, email).Return(mockUser, nil)
+
+		_, _, err = authUseCase.Login(email, password)
+		require.ErrorIs(t, err, ErrEmailNotVerified)
 
 		mockUserRepo.AssertExpectations(t)
 	})

@@ -4,7 +4,7 @@ services:
     container_name: postgres
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${PG_PASSWORD}
+      POSTGRES_PASSWORD: postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-scripts:/docker-entrypoint-initdb.d
@@ -36,14 +36,14 @@ services:
       dockerfile: Dockerfile
     container_name: go-auth
     environment:
-      PG_USER: ${PG_USER}
-      PG_PASSWORD: ${PG_PASSWORD}
+      PG_USER: postgres
+      PG_PASSWORD: postgres
       PG_HOST: postgres
       PG_PORT: 5432
-      PG_DBNAME: ${PG_DBNAME}
-      TOKEN_SECRET: ${TOKEN_SECRET}
-      DB_MAX_CONNS: ${DB_MAX_CONNS}
-      DB_CONN_TIMEOUT: ${DB_CONN_TIMEOUT}
+      PG_DBNAME: db_auth
+      TOKEN_SECRET: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+      DB_MAX_CONNS: 5
+      DB_CONN_TIMEOUT: 30s
       MIGRATIONS_PATH: /app/migrations
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -57,7 +57,7 @@ services:
       - ./config:/app/config
     ports:
       - "60051:60051"  # gRPC
-      - "8080:8080"    # HTTP REST Gateway
+      - "8081:8080"    # HTTP REST Gateway (изменен внешний порт на 8081 из-за конфликта с Jenkins на 8080)
     command: >
       sh -c "
         /app/migrate up &&

@@ -65,7 +65,16 @@ func (s *AuthServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Login
 
 	accessToken, refreshToken, err := s.auth.Login(req.Email, req.Password)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, usecase.ErrInvalidCredentials) {
+			return nil, status.Error(codes.Unauthenticated, "Invalid Credentials")
+		}
+		if errors.Is(err, usecase.ErrUserNotActive) {
+			return nil, status.Error(codes.PermissionDenied, err.Error())
+		}
+		if errors.Is(err, usecase.ErrEmailNotVerified) {
+			return nil, status.Error(codes.FailedPrecondition, err.Error())
+		}
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 	return &pb.LoginResponse{
 		AccessToken:  accessToken,
