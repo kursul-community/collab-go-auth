@@ -72,7 +72,7 @@ func (s *AuthServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Login
 			return nil, status.Error(codes.PermissionDenied, err.Error())
 		}
 		if errors.Is(err, usecase.ErrEmailNotVerified) {
-			return nil, status.Error(codes.FailedPrecondition, err.Error())
+			return nil, status.Error(codes.PermissionDenied, err.Error())
 		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
