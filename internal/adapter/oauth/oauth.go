@@ -254,6 +254,9 @@ func (p *githubProvider) GetAuthURL(state, redirectURL string) string {
 	params.Set("redirect_uri", redirectURL)
 	params.Set("scope", strings.Join(p.config.Scopes, " "))
 	params.Set("state", state)
+	// Примечание: GitHub автоматически пропускает окно авторизации,
+	// если пользователь уже авторизован и дал разрешение приложению.
+	// Это нормальное поведение OAuth 2.0.
 
 	return p.config.AuthURL + "?" + params.Encode()
 }

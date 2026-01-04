@@ -137,21 +137,40 @@ func extractProviderFromCallback(path string) string {
 	return path
 }
 
-// redirectWithTokens редиректит на фронтенд с токенами в URL
+// Константы для cookies (совпадают с gateway.go)
+const (
+	accessTokenCookieName  = "access_token"
+	refreshTokenCookieName = "refresh_token"
+	accessTokenMaxAge      = 30 * 60        // 30 минут
+	refreshTokenMaxAge     = 30 * 24 * 3600 // 30 дней
+)
+
+// redirectWithTokens редиректит на фронтенд с токенами в cookies
 func redirectWithTokens(w http.ResponseWriter, r *http.Request, frontendURL, accessToken, refreshToken string) {
-	u, err := url.Parse(frontendURL)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "invalid frontend URL")
-		return
-	}
+	// Устанавливаем access_token в HttpOnly cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     accessTokenCookieName,
+		Value:    accessToken,
+		Path:     "/",
+		HttpOnly: true, // HttpOnly для безопасности
+		Secure:   false, // true для HTTPS в production
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   accessTokenMaxAge,
+	})
 
-	q := u.Query()
-	q.Set("access_token", accessToken)
-	q.Set("refresh_token", refreshToken)
-	u.RawQuery = q.Encode()
+	// Устанавливаем refresh_token в cookie (НЕ HttpOnly, чтобы фронтенд мог читать)
+	http.SetCookie(w, &http.Cookie{
+		Name:     refreshTokenCookieName,
+		Value:    refreshToken,
+		Path:     "/",
+		HttpOnly: false, // НЕ HttpOnly, чтобы фронтенд мог читать для refresh
+		Secure:   false, // true для HTTPS в production
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   refreshTokenMaxAge,
+	})
 
-	log.Printf("OAuth: Redirecting to frontend with tokens")
-	http.Redirect(w, r, u.String(), http.StatusFound)
+	log.Printf("OAuth: Redirecting to frontend with tokens in cookies")
+	http.Redirect(w, r, frontendURL, http.StatusFound)
 }
 
 // redirectWithError редиректит на фронтенд с ошибкой

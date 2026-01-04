@@ -35,8 +35,28 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// Создаем gRPC Gateway mux
-	grpcMux := runtime.NewServeMux()
+	// Кастомный error handler для передачи заголовков при ошибках
+	customErrorHandler := func(ctx context.Context, mux *runtime.ServeMux, marshaler runtime.Marshaler, w http.ResponseWriter, r *http.Request, err error) {
+		// Извлекаем metadata из ServerMetadata
+		md, ok := runtime.ServerMetadataFromContext(ctx)
+		if ok {
+			// Проверяем наличие user-id и request-id в заголовках
+			if userID := md.HeaderMD.Get("user-id"); len(userID) > 0 {
+				w.Header().Set("user-id", userID[0])
+			}
+			if requestID := md.HeaderMD.Get("request-id"); len(requestID) > 0 {
+				w.Header().Set("request-id", requestID[0])
+			}
+		}
+		
+		// Используем стандартный обработчик ошибок
+		runtime.DefaultHTTPErrorHandler(ctx, mux, marshaler, w, r, err)
+	}
+
+	// Создаем gRPC Gateway mux с кастомным error handler
+	grpcMux := runtime.NewServeMux(
+		runtime.WithErrorHandler(customErrorHandler),
+	)
 
 	// Настройки для подключения к gRPC серверу
 	opts := []grpc.DialOption{

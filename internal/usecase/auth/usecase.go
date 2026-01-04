@@ -41,6 +41,21 @@ var (
 	ErrInvalidPasswordResetToken = errors.New("invalid or expired password reset token")
 )
 
+// LoginError - ошибка логина с дополнительной информацией
+type LoginError struct {
+	Err       error
+	UserID    string
+	RequestID string
+}
+
+func (e *LoginError) Error() string {
+	return e.Err.Error()
+}
+
+func (e *LoginError) Unwrap() error {
+	return e.Err
+}
+
 var _ AuthUseCase = (*auth)(nil)
 
 // AuthUseCase - интерфейс для аутентификации
@@ -435,12 +450,34 @@ func (uc *auth) Login(email string, password string) (string, string, error) {
 
 	// Проверяем, активен ли пользователь
 	if !curUser.IsActive {
-		return "", "", ErrUserNotActive
+		// Получаем requestID из Redis для неактивного пользователя
+		requestID, _ := uc.tokenRepo.GetEmailVerificationRequest(ctx, curUser.ID)
+		// Если requestID не найден, создаем новый
+		if requestID == "" {
+			requestID = uuid.New().String()
+			uc.tokenRepo.StoreEmailVerificationRequest(ctx, curUser.ID, requestID, VerificationCodeTTL)
+		}
+		return "", "", &LoginError{
+			Err:       ErrUserNotActive,
+			UserID:    curUser.ID,
+			RequestID: requestID,
+		}
 	}
 
 	// Проверяем, верифицирована ли почта
 	if !curUser.EmailVerified {
-		return "", "", ErrEmailNotVerified
+		// Получаем requestID из Redis для неверифицированного email
+		requestID, _ := uc.tokenRepo.GetEmailVerificationRequest(ctx, curUser.ID)
+		// Если requestID не найден, создаем новый
+		if requestID == "" {
+			requestID = uuid.New().String()
+			uc.tokenRepo.StoreEmailVerificationRequest(ctx, curUser.ID, requestID, VerificationCodeTTL)
+		}
+		return "", "", &LoginError{
+			Err:       ErrEmailNotVerified,
+			UserID:    curUser.ID,
+			RequestID: requestID,
+		}
 	}
 
 	// Генерируем access токен

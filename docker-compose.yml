@@ -61,7 +61,7 @@ services:
       - ./config:/app/config
     ports:
       - "60051:60051"  # gRPC
-      - "8081:8080"    # HTTP REST Gateway (изменен внешний порт на 8081 из-за конфликта с Jenkins на 8080)
+      - "8081:8080"    # HTTP REST Gateway
     command: >
       sh -c "
         /app/migrate up &&

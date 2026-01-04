@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
 	pb "go-auth/gen/auth"
@@ -68,12 +70,27 @@ func (s *AuthServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Login
 		if errors.Is(err, usecase.ErrInvalidCredentials) {
 			return nil, status.Error(codes.Unauthenticated, "Invalid Credentials")
 		}
-		if errors.Is(err, usecase.ErrUserNotActive) {
-			return nil, status.Error(codes.PermissionDenied, "User account is not active")
+		
+		// Проверяем, является ли ошибка LoginError с userID и requestID
+		var loginErr *usecase.LoginError
+		if errors.As(err, &loginErr) {
+			// Добавляем userID и requestID в metadata ответа
+			md := metadata.New(map[string]string{
+				"user-id":    loginErr.UserID,
+				"request-id": loginErr.RequestID,
+			})
+			// Устанавливаем metadata через SetHeader для gRPC
+			// Это должно работать для передачи через gateway
+			grpc.SetHeader(ctx, md)
+			
+			if errors.Is(loginErr.Err, usecase.ErrUserNotActive) {
+				return nil, status.Error(codes.PermissionDenied, "User account is not active")
+			}
+			if errors.Is(loginErr.Err, usecase.ErrEmailNotVerified) {
+				return nil, status.Error(codes.PermissionDenied, "Email not verified")
+			}
 		}
-		if errors.Is(err, usecase.ErrEmailNotVerified) {
-			return nil, status.Error(codes.PermissionDenied, "Email not verified")
-		}
+		
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	return &pb.LoginResponse{
