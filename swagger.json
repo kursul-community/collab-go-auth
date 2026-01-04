@@ -66,7 +66,7 @@
       "post": {
         "tags": ["Auth"],
         "summary": "Вход в систему",
-        "description": "Аутентификация пользователя по email и паролю. Возвращает access и refresh токены.",
+        "description": "Аутентификация пользователя по email и паролю. Возвращает access и refresh токены в JSON ответе и устанавливает их в cookies. Токены сохраняются в Redis для возможности отзыва.\n\n**Cookies:**\n- `access_token` - HttpOnly, Max-Age: 1800 (30 минут), SameSite: Lax\n- `refresh_token` - НЕ HttpOnly (доступен из JavaScript), Max-Age: 2592000 (30 дней), SameSite: Lax",
         "operationId": "login",
         "requestBody": {
           "required": true,
@@ -80,7 +80,16 @@
         },
         "responses": {
           "200": {
-            "description": "Успешная аутентификация",
+            "description": "Успешная аутентификация. Токены возвращаются в JSON и устанавливаются в cookies.",
+            "headers": {
+              "Set-Cookie": {
+                "description": "Cookies с токенами: access_token (HttpOnly) и refresh_token (доступен из JS)",
+                "schema": {
+                  "type": "string",
+                  "example": "access_token=eyJ...; Path=/; Max-Age=1800; HttpOnly; SameSite=Lax, refresh_token=eyJ...; Path=/; Max-Age=2592000; SameSite=Lax"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -116,7 +125,7 @@
       "post": {
         "tags": ["Auth"],
         "summary": "Обновление access токена",
-        "description": "Получение нового access токена по refresh токену",
+        "description": "Получение нового access токена по refresh токену. Проверяет валидность refresh токена (подпись, срок действия, наличие в Redis) и генерирует новый access токен. Новый access токен устанавливается в cookie.\n\n**Cookies:**\n- `access_token` - HttpOnly, Max-Age: 1800 (30 минут), SameSite: Lax",
         "operationId": "refreshToken",
         "requestBody": {
           "required": true,
@@ -130,7 +139,16 @@
         },
         "responses": {
           "200": {
-            "description": "Токен успешно обновлен",
+            "description": "Токен успешно обновлен. Новый access токен возвращается в JSON и устанавливается в cookie.",
+            "headers": {
+              "Set-Cookie": {
+                "description": "Cookie с новым access токеном (HttpOnly)",
+                "schema": {
+                  "type": "string",
+                  "example": "access_token=eyJ...; Path=/; Max-Age=1800; HttpOnly; SameSite=Lax"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -139,8 +157,18 @@
               }
             }
           },
+          "400": {
+            "description": "Некорректный формат refresh токена",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "401": {
-            "description": "Невалидный или истекший refresh токен",
+            "description": "Невалидный или истекший refresh токен, либо токен был отозван",
             "content": {
               "application/json": {
                 "schema": {
@@ -156,7 +184,7 @@
       "post": {
         "tags": ["Auth"],
         "summary": "Проверка access токена",
-        "description": "Проверяет валидность access токена",
+        "description": "Проверяет валидность access токена (подпись, срок действия, наличие в Redis)",
         "operationId": "validateToken",
         "requestBody": {
           "required": true,
@@ -175,6 +203,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ValidateTokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Некорректный формат токена",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             }
@@ -228,6 +266,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Email уже подтвержден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       }
@@ -260,7 +308,7 @@
             }
           },
           "400": {
-            "description": "Невалидный request_id или email уже подтвержден",
+            "description": "Невалидный request_id",
             "content": {
               "application/json": {
                 "schema": {
@@ -271,6 +319,16 @@
           },
           "404": {
             "description": "Пользователь не найден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Email уже подтвержден",
             "content": {
               "application/json": {
                 "schema": {
@@ -606,38 +664,38 @@
       },
       "LoginResponse": {
         "type": "object",
-        "required": ["access_token", "refresh_token"],
+        "required": ["accessToken", "refreshToken"],
         "properties": {
-          "access_token": {
+          "accessToken": {
             "type": "string",
-            "description": "JWT access токен для авторизации запросов",
+            "description": "JWT access токен для авторизации запросов. Также устанавливается в cookie `access_token` (HttpOnly, 30 минут)",
             "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
           },
-          "refresh_token": {
+          "refreshToken": {
             "type": "string",
-            "description": "JWT refresh токен для обновления access токена",
+            "description": "JWT refresh токен для обновления access токена. Также устанавливается в cookie `refresh_token` (доступен из JavaScript, 30 дней)",
             "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
           }
         }
       },
       "RefreshTokenRequest": {
         "type": "object",
-        "required": ["refresh_token"],
+        "required": ["refreshToken"],
         "properties": {
-          "refresh_token": {
+          "refreshToken": {
             "type": "string",
-            "description": "Refresh токен",
+            "description": "Refresh токен (можно передать в теле запроса или использовать из cookie `refresh_token`)",
             "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
           }
         }
       },
       "RefreshTokenResponse": {
         "type": "object",
-        "required": ["access_token"],
+        "required": ["accessToken"],
         "properties": {
-          "access_token": {
+          "accessToken": {
             "type": "string",
-            "description": "Новый JWT access токен",
+            "description": "Новый JWT access токен. Также устанавливается в cookie `access_token` (HttpOnly, 30 минут)",
             "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
           }
         }

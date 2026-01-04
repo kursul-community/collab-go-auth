@@ -10,14 +10,13 @@ import (
 
 // Префиксы ключей в Redis
 const (
-	accessTokenPrefix              = "access_token:"           // Префикс для активных access токенов
-	refreshTokenPrefix             = "refresh_token:"          // Префикс для refresh токенов
-	userSessionsPrefix             = "user_sessions:"          // Префикс для списка сессий пользователя
-	userAccessTokens               = "user_access:"            // Префикс для списка access токенов пользователя
-	emailVerificationPrefix        = "email_verification:"     // Префикс для кодов верификации email
-	emailVerificationRequestPrefix = "email_verification_req:" // Префикс для requestId верификации email
-	passwordResetPrefix            = "password_reset:"         // Префикс для запросов сброса пароля
-	oauthStatePrefix               = "oauth_state:"            // Префикс для OAuth state (CSRF защита)
+	accessTokenPrefix              = "access_token:"                    // Префикс для активных access токенов
+	refreshTokenPrefix             = "refresh_token:"                   // Префикс для refresh токенов
+	userSessionsPrefix             = "user_sessions:"                   // Префикс для списка сессий пользователя
+	userAccessTokens               = "user_access:"                     // Префикс для списка access токенов пользователя
+	emailVerificationPrefix        = "email_verification:"              // Префикс для кодов верификации email
+	emailVerificationRequestPrefix = "email_verification_request:"      // Префикс для requestID верификации email
+	passwordResetRequestPrefix     = "password_reset_request:"          // Префикс для requestID сброса пароля
 )
 
 // Убедимся, что repository реализует интерфейс Repository
@@ -48,34 +47,28 @@ type Repository interface {
 	GetUserSessions(ctx context.Context, userID string) ([]string, error)
 
 	// === Верификация email ===
-	// StoreVerificationCode - сохранение кода верификации email
-	StoreVerificationCode(ctx context.Context, email string, code string, ttl time.Duration) error
-	// GetVerificationCode - получение кода верификации email
-	GetVerificationCode(ctx context.Context, email string) (string, error)
-	// DeleteVerificationCode - удаление кода верификации email
-	DeleteVerificationCode(ctx context.Context, email string) error
-	// StoreEmailVerificationRequest - сохранение requestId для верификации email
+	// StoreVerificationCode - сохранение кода верификации email (по userID)
+	StoreVerificationCode(ctx context.Context, userID string, code string, ttl time.Duration) error
+	// GetVerificationCode - получение кода верификации email (по userID)
+	GetVerificationCode(ctx context.Context, userID string) (string, error)
+	// DeleteVerificationCode - удаление кода верификации email (по userID)
+	DeleteVerificationCode(ctx context.Context, userID string) error
+
+	// === Email verification request ===
+	// StoreEmailVerificationRequest - сохранение requestID для верификации email
 	StoreEmailVerificationRequest(ctx context.Context, userID string, requestID string, ttl time.Duration) error
-	// GetEmailVerificationRequest - получение requestId для верификации email
+	// GetEmailVerificationRequest - получение requestID для верификации email
 	GetEmailVerificationRequest(ctx context.Context, userID string) (string, error)
-	// DeleteEmailVerificationRequest - удаление requestId верификации email
+	// DeleteEmailVerificationRequest - удаление requestID после верификации
 	DeleteEmailVerificationRequest(ctx context.Context, userID string) error
 
-	// === Восстановление пароля ===
-	// StorePasswordResetRequest - сохранение запроса на сброс пароля (userID -> requestID)
+	// === Password reset request ===
+	// StorePasswordResetRequest - сохранение requestID для сброса пароля
 	StorePasswordResetRequest(ctx context.Context, userID string, requestID string, ttl time.Duration) error
 	// GetPasswordResetRequest - получение requestID для сброса пароля
 	GetPasswordResetRequest(ctx context.Context, userID string) (string, error)
-	// DeletePasswordResetRequest - удаление запроса на сброс пароля
+	// DeletePasswordResetRequest - удаление requestID после сброса пароля
 	DeletePasswordResetRequest(ctx context.Context, userID string) error
-
-	// === OAuth ===
-	// StoreOAuthState - сохранение OAuth state для CSRF защиты
-	StoreOAuthState(ctx context.Context, state string, provider string, ttl time.Duration) error
-	// GetOAuthState - получение провайдера по OAuth state
-	GetOAuthState(ctx context.Context, state string) (string, error)
-	// DeleteOAuthState - удаление OAuth state
-	DeleteOAuthState(ctx context.Context, state string) error
 }
 
 // repository - структура репозитория для работы с Redis
@@ -242,9 +235,9 @@ func (r *repository) GetUserSessions(ctx context.Context, userID string) ([]stri
 
 // ==================== Верификация email ====================
 
-// StoreVerificationCode - сохранение кода верификации email в Redis
-func (r *repository) StoreVerificationCode(ctx context.Context, email string, code string, ttl time.Duration) error {
-	key := emailVerificationPrefix + email
+// StoreVerificationCode - сохранение кода верификации email в Redis (по userID)
+func (r *repository) StoreVerificationCode(ctx context.Context, userID string, code string, ttl time.Duration) error {
+	key := emailVerificationPrefix + userID
 	err := r.client.Set(ctx, key, code, ttl).Err()
 	if err != nil {
 		return fmt.Errorf("failed to store verification code: %w", err)
@@ -252,9 +245,9 @@ func (r *repository) StoreVerificationCode(ctx context.Context, email string, co
 	return nil
 }
 
-// GetVerificationCode - получение кода верификации email из Redis
-func (r *repository) GetVerificationCode(ctx context.Context, email string) (string, error) {
-	key := emailVerificationPrefix + email
+// GetVerificationCode - получение кода верификации email из Redis (по userID)
+func (r *repository) GetVerificationCode(ctx context.Context, userID string) (string, error) {
+	key := emailVerificationPrefix + userID
 	code, err := r.client.Get(ctx, key).Result()
 	if err == redis.Nil {
 		return "", nil // Код не найден
@@ -265,9 +258,9 @@ func (r *repository) GetVerificationCode(ctx context.Context, email string) (str
 	return code, nil
 }
 
-// DeleteVerificationCode - удаление кода верификации email из Redis
-func (r *repository) DeleteVerificationCode(ctx context.Context, email string) error {
-	key := emailVerificationPrefix + email
+// DeleteVerificationCode - удаление кода верификации email из Redis (по userID)
+func (r *repository) DeleteVerificationCode(ctx context.Context, userID string) error {
+	key := emailVerificationPrefix + userID
 	err := r.client.Del(ctx, key).Err()
 	if err != nil {
 		return fmt.Errorf("failed to delete verification code: %w", err)
@@ -275,7 +268,9 @@ func (r *repository) DeleteVerificationCode(ctx context.Context, email string) e
 	return nil
 }
 
-// StoreEmailVerificationRequest - сохранение requestId для верификации email в Redis
+// ==================== Email verification request ====================
+
+// StoreEmailVerificationRequest - сохранение requestID для верификации email в Redis
 func (r *repository) StoreEmailVerificationRequest(ctx context.Context, userID string, requestID string, ttl time.Duration) error {
 	key := emailVerificationRequestPrefix + userID
 	err := r.client.Set(ctx, key, requestID, ttl).Err()
@@ -285,12 +280,12 @@ func (r *repository) StoreEmailVerificationRequest(ctx context.Context, userID s
 	return nil
 }
 
-// GetEmailVerificationRequest - получение requestId для верификации email из Redis
+// GetEmailVerificationRequest - получение requestID для верификации email из Redis
 func (r *repository) GetEmailVerificationRequest(ctx context.Context, userID string) (string, error) {
 	key := emailVerificationRequestPrefix + userID
 	requestID, err := r.client.Get(ctx, key).Result()
 	if err == redis.Nil {
-		return "", nil // Запрос не найден
+		return "", nil // RequestID не найден
 	}
 	if err != nil {
 		return "", fmt.Errorf("failed to get email verification request: %w", err)
@@ -298,7 +293,7 @@ func (r *repository) GetEmailVerificationRequest(ctx context.Context, userID str
 	return requestID, nil
 }
 
-// DeleteEmailVerificationRequest - удаление requestId верификации email из Redis
+// DeleteEmailVerificationRequest - удаление requestID после верификации email из Redis
 func (r *repository) DeleteEmailVerificationRequest(ctx context.Context, userID string) error {
 	key := emailVerificationRequestPrefix + userID
 	err := r.client.Del(ctx, key).Err()
@@ -308,11 +303,11 @@ func (r *repository) DeleteEmailVerificationRequest(ctx context.Context, userID 
 	return nil
 }
 
-// ==================== Восстановление пароля ====================
+// ==================== Password reset request ====================
 
-// StorePasswordResetRequest - сохранение запроса на сброс пароля в Redis
+// StorePasswordResetRequest - сохранение requestID для сброса пароля в Redis
 func (r *repository) StorePasswordResetRequest(ctx context.Context, userID string, requestID string, ttl time.Duration) error {
-	key := passwordResetPrefix + userID
+	key := passwordResetRequestPrefix + userID
 	err := r.client.Set(ctx, key, requestID, ttl).Err()
 	if err != nil {
 		return fmt.Errorf("failed to store password reset request: %w", err)
@@ -322,10 +317,10 @@ func (r *repository) StorePasswordResetRequest(ctx context.Context, userID strin
 
 // GetPasswordResetRequest - получение requestID для сброса пароля из Redis
 func (r *repository) GetPasswordResetRequest(ctx context.Context, userID string) (string, error) {
-	key := passwordResetPrefix + userID
+	key := passwordResetRequestPrefix + userID
 	requestID, err := r.client.Get(ctx, key).Result()
 	if err == redis.Nil {
-		return "", nil // Запрос не найден
+		return "", nil // RequestID не найден
 	}
 	if err != nil {
 		return "", fmt.Errorf("failed to get password reset request: %w", err)
@@ -333,52 +328,12 @@ func (r *repository) GetPasswordResetRequest(ctx context.Context, userID string)
 	return requestID, nil
 }
 
-// DeletePasswordResetRequest - удаление запроса на сброс пароля из Redis
+// DeletePasswordResetRequest - удаление requestID после сброса пароля из Redis
 func (r *repository) DeletePasswordResetRequest(ctx context.Context, userID string) error {
-	key := passwordResetPrefix + userID
+	key := passwordResetRequestPrefix + userID
 	err := r.client.Del(ctx, key).Err()
 	if err != nil {
 		return fmt.Errorf("failed to delete password reset request: %w", err)
-	}
-	return nil
-}
-
-// ==================== OAuth ====================
-
-// StoreOAuthState - сохранение OAuth state для CSRF защиты
-func (r *repository) StoreOAuthState(ctx context.Context, state string, provider string, ttl time.Duration) error {
-	key := oauthStatePrefix + state
-	err := r.client.Set(ctx, key, provider, ttl).Err()
-	if err != nil {
-		return fmt.Errorf("failed to store oauth state: %w", err)
-	}
-	// Проверяем, что действительно сохранилось
-	stored, _ := r.client.Get(ctx, key).Result()
-	if stored != provider {
-		return fmt.Errorf("failed to verify oauth state storage: expected %s, got %s", provider, stored)
-	}
-	return nil
-}
-
-// GetOAuthState - получение провайдера по OAuth state
-func (r *repository) GetOAuthState(ctx context.Context, state string) (string, error) {
-	key := oauthStatePrefix + state
-	provider, err := r.client.Get(ctx, key).Result()
-	if err == redis.Nil {
-		return "", nil // State не найден
-	}
-	if err != nil {
-		return "", fmt.Errorf("failed to get oauth state: %w", err)
-	}
-	return provider, nil
-}
-
-// DeleteOAuthState - удаление OAuth state
-func (r *repository) DeleteOAuthState(ctx context.Context, state string) error {
-	key := oauthStatePrefix + state
-	err := r.client.Del(ctx, key).Err()
-	if err != nil {
-		return fmt.Errorf("failed to delete oauth state: %w", err)
 	}
 	return nil
 }
