@@ -186,3 +186,67 @@ metrics:
   enabled: false
   path: "/metrics"
   port: 9090
+
+# -----------------------------------------------------------------------------
+# Сброс пароля
+# -----------------------------------------------------------------------------
+passwordReset:
+  ttl: "1h"
+  frontendURL: "http://localhost:5173/reset-password"
+
+# -----------------------------------------------------------------------------
+# OAuth2 Провайдеры
+# Credentials загружаются из переменных окружения:
+# OAUTH_GOOGLE_CLIENT_ID, OAUTH_GOOGLE_CLIENT_SECRET
+# OAUTH_GITHUB_CLIENT_ID, OAUTH_GITHUB_CLIENT_SECRET
+# OAUTH_YANDEX_CLIENT_ID, OAUTH_YANDEX_CLIENT_SECRET
+# OAUTH_VK_CLIENT_ID, OAUTH_VK_CLIENT_SECRET
+# -----------------------------------------------------------------------------
+oauth:
+  # URL для редиректа после OAuth авторизации
+  frontendCallbackURL: "http://localhost:5173/auth/callback"
+  # URL бэкенда для callback от провайдеров
+  backendBaseURL: "http://localhost:8081"
+  # Время жизни state токена (защита от CSRF)
+  stateTTL: "10m"
+  
+  providers:
+    google:
+      enabled: true
+      displayName: "Google"
+      # clientId и clientSecret загружаются из env
+      authURL: "https://accounts.google.com/o/oauth2/v2/auth"
+      tokenURL: "https://oauth2.googleapis.com/token"
+      userInfoURL: "https://www.googleapis.com/oauth2/v2/userinfo"
+      scopes:
+        - "email"
+        - "profile"
+    
+    github:
+      enabled: true
+      displayName: "GitHub"
+      authURL: "https://github.com/login/oauth/authorize"
+      tokenURL: "https://github.com/login/oauth/access_token"
+      userInfoURL: "https://api.github.com/user"
+      scopes:
+        - "user:email"
+        - "read:user"
+    
+    yandex:
+      enabled: false
+      displayName: "Яндекс"
+      authURL: "https://oauth.yandex.ru/authorize"
+      tokenURL: "https://oauth.yandex.ru/token"
+      userInfoURL: "https://login.yandex.ru/info"
+      scopes:
+        - "login:email"
+        - "login:info"
+    
+    vk:
+      enabled: false
+      displayName: "ВКонтакте"
+      authURL: "https://oauth.vk.com/authorize"
+      tokenURL: "https://oauth.vk.com/access_token"
+      userInfoURL: "https://api.vk.com/method/users.get"
+      scopes:
+        - "email"

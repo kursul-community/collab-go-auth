@@ -10,13 +10,14 @@ import (
 
 // Префиксы ключей в Redis
 const (
-	accessTokenPrefix              = "access_token:"                    // Префикс для активных access токенов
-	refreshTokenPrefix             = "refresh_token:"                   // Префикс для refresh токенов
-	userSessionsPrefix             = "user_sessions:"                   // Префикс для списка сессий пользователя
-	userAccessTokens               = "user_access:"                     // Префикс для списка access токенов пользователя
-	emailVerificationPrefix        = "email_verification:"              // Префикс для кодов верификации email
-	emailVerificationRequestPrefix = "email_verification_request:"      // Префикс для requestID верификации email
-	passwordResetRequestPrefix     = "password_reset_request:"          // Префикс для requestID сброса пароля
+	accessTokenPrefix              = "access_token:"               // Префикс для активных access токенов
+	refreshTokenPrefix             = "refresh_token:"              // Префикс для refresh токенов
+	userSessionsPrefix             = "user_sessions:"              // Префикс для списка сессий пользователя
+	userAccessTokens               = "user_access:"                // Префикс для списка access токенов пользователя
+	emailVerificationPrefix        = "email_verification:"         // Префикс для кодов верификации email
+	emailVerificationRequestPrefix = "email_verification_request:" // Префикс для requestID верификации email
+	passwordResetRequestPrefix     = "password_reset_request:"     // Префикс для requestID сброса пароля
+	oauthStatePrefix               = "oauth_state:"                // Префикс для OAuth state (CSRF защита)
 )
 
 // Убедимся, что repository реализует интерфейс Repository
@@ -69,6 +70,14 @@ type Repository interface {
 	GetPasswordResetRequest(ctx context.Context, userID string) (string, error)
 	// DeletePasswordResetRequest - удаление requestID после сброса пароля
 	DeletePasswordResetRequest(ctx context.Context, userID string) error
+
+	// === OAuth ===
+	// StoreOAuthState - сохранение OAuth state для CSRF защиты
+	StoreOAuthState(ctx context.Context, state string, provider string, ttl time.Duration) error
+	// GetOAuthState - получение провайдера по OAuth state
+	GetOAuthState(ctx context.Context, state string) (string, error)
+	// DeleteOAuthState - удаление OAuth state
+	DeleteOAuthState(ctx context.Context, state string) error
 }
 
 // repository - структура репозитория для работы с Redis
@@ -334,6 +343,48 @@ func (r *repository) DeletePasswordResetRequest(ctx context.Context, userID stri
 	err := r.client.Del(ctx, key).Err()
 	if err != nil {
 		return fmt.Errorf("failed to delete password reset request: %w", err)
+	}
+	return nil
+}
+
+// ==================== OAuth ====================
+
+// StoreOAuthState - сохранение OAuth state для CSRF защиты
+func (r *repository) StoreOAuthState(ctx context.Context, state string, provider string, ttl time.Duration) error {
+	key := oauthStatePrefix + state
+	err := r.client.Set(ctx, key, provider, ttl).Err()
+	if err != nil {
+		return fmt.Errorf("failed to store oauth state: %w", err)
+	}
+
+	// Проверяем, что действительно сохранилось
+	stored, _ := r.client.Get(ctx, key).Result()
+	if stored != provider {
+		return fmt.Errorf("failed to verify oauth state storage: expected %s, got %s", provider, stored)
+	}
+
+	return nil
+}
+
+// GetOAuthState - получение провайдера по OAuth state
+func (r *repository) GetOAuthState(ctx context.Context, state string) (string, error) {
+	key := oauthStatePrefix + state
+	provider, err := r.client.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return "", nil // State не найден
+	}
+	if err != nil {
+		return "", fmt.Errorf("failed to get oauth state: %w", err)
+	}
+	return provider, nil
+}
+
+// DeleteOAuthState - удаление OAuth state
+func (r *repository) DeleteOAuthState(ctx context.Context, state string) error {
+	key := oauthStatePrefix + state
+	err := r.client.Del(ctx, key).Err()
+	if err != nil {
+		return fmt.Errorf("failed to delete oauth state: %w", err)
 	}
 	return nil
 }

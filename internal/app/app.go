@@ -14,9 +14,11 @@ import (
 	"go-auth/gen/auth"
 	"go-auth/internal/adapter/database"
 	emailadapter "go-auth/internal/adapter/email"
+	oauthadapter "go-auth/internal/adapter/oauth"
 	redisadapter "go-auth/internal/adapter/redis"
 	"go-auth/internal/adapter/token"
 	grpcauth "go-auth/internal/controller/grpc/auth"
+	oauthhttp "go-auth/internal/controller/http/oauth"
 	tokenrepo "go-auth/internal/repo/token"
 	"go-auth/internal/repo/user"
 	usecase "go-auth/internal/usecase/auth"
@@ -63,8 +65,6 @@ func Run(cfg *config.Config, devMode bool) {
 	logger.Printf("Email service initialized (SMTP: %s)", cfg.SMTP.Addr())
 
 	// Создаем слой usecase с TTL параметрами
-	// Используем дефолтное значение для passwordResetTTL (0 = будет использован DefaultPasswordResetTTL)
-	// Используем пустую строку для frontendURL (можно добавить в конфиг позже)
 	authUseCase := usecase.NewAuthUseCase(
 		userRepo,
 		tokenRepo,
@@ -72,9 +72,26 @@ func Run(cfg *config.Config, devMode bool) {
 		mailer,
 		cfg.Token.AccessTTL,
 		cfg.Token.RefreshTTL,
-		0, // passwordResetTTL - будет использован дефолт
-		"", // frontendURL - можно добавить в конфиг позже
+		cfg.PasswordReset.TTL,
+		cfg.PasswordReset.FrontendURL,
 	)
+
+	// Создаем OAuth менеджер и usecase
+	oauthManager := oauthadapter.NewManager(&cfg.OAuth)
+	var oauthHandler *oauthhttp.Handler
+
+	// Проверяем, есть ли включенные OAuth провайдеры
+	enabledProviders := cfg.GetEnabledOAuthProviders()
+	if len(enabledProviders) > 0 {
+		baseAuth := usecase.GetBaseAuth(authUseCase)
+		if baseAuth != nil {
+			oauthUseCase := usecase.NewOAuthUseCase(baseAuth, oauthManager, cfg.OAuth.StateTTL)
+			oauthHandler = oauthhttp.NewHandler(oauthUseCase, cfg.OAuth.FrontendCallbackURL)
+			logger.Printf("OAuth initialized with providers: %v", enabledProviders)
+		}
+	} else {
+		logger.Printf("OAuth disabled (no enabled providers)")
+	}
 
 	// Создаем gRPC-сервер
 	grpcServer := grpc.NewServer(
@@ -102,7 +119,7 @@ func Run(cfg *config.Config, devMode bool) {
 	}()
 
 	// Запускаем HTTP Gateway для REST API
-	if err := RunGateway(cfg); err != nil {
+	if err := RunGateway(cfg, oauthHandler); err != nil {
 		logger.Fatalf("Failed to serve HTTP Gateway: %v", err)
 	}
 }
