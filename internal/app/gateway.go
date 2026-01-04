@@ -122,7 +122,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		w.Header().Set("Access-Control-Allow-Credentials", "true") // Разрешаем cookies
-		w.Header().Set("Content-Type", "application/json")
+		// Не устанавливаем Content-Type здесь - grpc-gateway установит его сам для правильной сериализации ошибок
 
 		// Обрабатываем preflight запросы
 		if r.Method == "OPTIONS" {
@@ -196,19 +196,24 @@ func cookieMiddleware(next http.Handler) http.Handler {
 			}
 		}
 
-		// Копируем заголовки из буфера
+		// Копируем заголовки из буфера (важно делать это до WriteHeader)
+		// grpc-gateway устанавливает заголовки через Header(), поэтому они должны быть в bw.headers
 		for key, values := range bw.headers {
 			for _, value := range values {
-				w.Header().Add(key, value)
+				w.Header().Set(key, value)
 			}
 		}
 
-		// Записываем статус код
+		// Записываем статус код (важно делать это перед записью тела)
+		// grpc-gateway устанавливает статус код через WriteHeader()
 		if bw.statusCode != 0 {
 			w.WriteHeader(bw.statusCode)
+		} else {
+			// Если статус не установлен, устанавливаем 200 по умолчанию
+			w.WriteHeader(http.StatusOK)
 		}
 
-		// Записываем тело ответа
+		// Записываем тело ответа (включая ошибки в формате gRPC с code, message, details)
 		w.Write(bw.buf.Bytes())
 	})
 }
