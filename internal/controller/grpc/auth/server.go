@@ -39,7 +39,7 @@ func (s *AuthServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb
 		Password: req.Password,
 	}
 	if err := validator.ValidateRequest(validateReq); err != nil {
-		return nil, err
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	userID, requestID, err := s.auth.Register(req.Email, req.Password)
@@ -60,7 +60,7 @@ func (s *AuthServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Login
 		Password: req.Password,
 	}
 	if err := validator.ValidateRequest(validateReq); err != nil {
-		return nil, err
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	accessToken, refreshToken, err := s.auth.Login(req.Email, req.Password)
@@ -69,10 +69,10 @@ func (s *AuthServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Login
 			return nil, status.Error(codes.Unauthenticated, "Invalid Credentials")
 		}
 		if errors.Is(err, usecase.ErrUserNotActive) {
-			return nil, status.Error(codes.PermissionDenied, err.Error())
+			return nil, status.Error(codes.PermissionDenied, "User account is not active")
 		}
 		if errors.Is(err, usecase.ErrEmailNotVerified) {
-			return nil, status.Error(codes.PermissionDenied, err.Error())
+			return nil, status.Error(codes.PermissionDenied, "Email not verified")
 		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
