@@ -33,6 +33,13 @@
         registry: "{{ backend_image.split('/')[0] if backend_image and '/' in backend_image else 'ghcr.io' }}"
         image_name: "{{ backend_image.split('/')[1:] | join('/') | regex_replace(':[^:]*$', '') if '/' in backend_image else backend_image.split(':')[0] }}"
 
+    - name: Login to GitHub Container Registry
+      community.docker.docker_login:
+        registry_url: "{{ registry }}"
+        username: "{{ lookup('env', 'GHCR_USERNAME') | default('github', true) }}"
+        password: "{{ lookup('env', 'GHCR_TOKEN') }}"
+      when: registry == 'ghcr.io' and lookup('env', 'GHCR_TOKEN') is defined
+
     - name: Down Auth
       community.docker.docker_compose_v2:
         project_src: "{{ deploy_path }}"
