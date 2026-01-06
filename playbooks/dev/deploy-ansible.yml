@@ -81,10 +81,10 @@
         MIGRATIONS_PATH: "{{ lookup('env', 'MIGRATIONS_PATH') }}"
         REDIS_HOST: "{{ lookup('env', 'REDIS_HOST') }}"
         REDIS_PORT: "{{ lookup('env', 'REDIS_PORT') }}"
-        OAUTH_GOOGLE_CLIENT_ID: "{{ lookup('env', 'OAUTH_GOOGLE_CLIENT_ID') }}"
-        OAUTH_GOOGLE_CLIENT_SECRET: "{{ lookup('env', 'OAUTH_GOOGLE_CLIENT_SECRET') }}"
-        OAUTH_GITHUB_CLIENT_ID: "{{ lookup('env', 'OAUTH_GITHUB_CLIENT_ID') }}"
-        OAUTH_GITHUB_CLIENT_SECRET: "{{ lookup('env', 'OAUTH_GITHUB_CLIENT_SECRET') }}"
+        # OAUTH_GOOGLE_CLIENT_ID: "{{ lookup('env', 'OAUTH_GOOGLE_CLIENT_ID') }}"
+        # OAUTH_GOOGLE_CLIENT_SECRET: "{{ lookup('env', 'OAUTH_GOOGLE_CLIENT_SECRET') }}"
+        # OAUTH_GITHUB_CLIENT_ID: "{{ lookup('env', 'OAUTH_GITHUB_CLIENT_ID') }}"
+        # OAUTH_GITHUB_CLIENT_SECRET: "{{ lookup('env', 'OAUTH_GITHUB_CLIENT_SECRET') }}"
 
     - name: Run Database Migrations
       community.docker.docker_compose_v2:
@@ -108,7 +108,7 @@
         MIGRATIONS_PATH: "{{ lookup('env', 'MIGRATIONS_PATH') }}"
         REDIS_HOST: "{{ lookup('env', 'REDIS_HOST') }}"
         REDIS_PORT: "{{ lookup('env', 'REDIS_PORT') }}"
-        OAUTH_GOOGLE_CLIENT_ID: "{{ lookup('env', 'OAUTH_GOOGLE_CLIENT_ID') }}"
-        OAUTH_GOOGLE_CLIENT_SECRET: "{{ lookup('env', 'OAUTH_GOOGLE_CLIENT_SECRET') }}"
-        OAUTH_GITHUB_CLIENT_ID: "{{ lookup('env', 'OAUTH_GITHUB_CLIENT_ID') }}"
-        OAUTH_GITHUB_CLIENT_SECRET: "{{ lookup('env', 'OAUTH_GITHUB_CLIENT_SECRET') }}"
+        # OAUTH_GOOGLE_CLIENT_ID: "{{ lookup('env', 'OAUTH_GOOGLE_CLIENT_ID') }}"
+        # OAUTH_GOOGLE_CLIENT_SECRET: "{{ lookup('env', 'OAUTH_GOOGLE_CLIENT_SECRET') }}"
+        # OAUTH_GITHUB_CLIENT_ID: "{{ lookup('env', 'OAUTH_GITHUB_CLIENT_ID') }}"
+        # OAUTH_GITHUB_CLIENT_SECRET: "{{ lookup('env', 'OAUTH_GITHUB_CLIENT_SECRET') }}"
