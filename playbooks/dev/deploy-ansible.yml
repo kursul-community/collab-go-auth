@@ -22,11 +22,11 @@
         dest: "{{ deploy_path }}/docker-compose.dev.yml"
         mode: "0644"
 
-    - name: Copy nginx file
-      ansible.builtin.copy:
-        src: "{{ nginx_file }}"
-        dest: "{{ deploy_path }}/nginx/auth.conf"
-        mode: "0644"
+    # - name: Copy nginx file
+    #   ansible.builtin.copy:
+    #     src: "{{ nginx_file }}"
+    #     dest: "{{ deploy_path }}/nginx/auth.conf"
+    #     mode: "0644"
 
     - name: Update BACKEND_IMAGE_TAG in .env
       ansible.builtin.lineinfile:
