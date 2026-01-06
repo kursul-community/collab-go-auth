@@ -60,3 +60,7 @@ services:
     ports:
       - "60051:60051"  # gRPC
       - "8081:8080"    # HTTP REST Gateway
+
+volumes:
+  postgres_data:
+  redis_data:
