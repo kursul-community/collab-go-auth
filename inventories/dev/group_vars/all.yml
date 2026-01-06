@@ -1,0 +1,3 @@
+deploy_path: /home/collab-user/apps/auth
+compose_file: ../../docker-compose.dev.yml
+nginx_file: ../../nginx/auth.conf

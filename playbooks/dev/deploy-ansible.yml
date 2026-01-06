@@ -1,0 +1,72 @@
+---
+- name: Deploy Auth
+  hosts: develop
+  become: no
+
+  tasks: 
+    - name: Ensure deployment directory exists
+      ansible.builtin.file:
+        path: "{{ deploy_path }}"
+        state: directory
+        mode: "0755"
+      
+    - name: Ensure infra directory 
+      ansible.builtin.file:
+        path: "{{ deploy_path }}/infra"
+        state: directory
+        mode: "0755"
+
+    - name: Copy docker compose file
+      ansible.builtin.copy:
+        src: "{{ compose_file }}"
+        dest: "{{ deploy_path }}/docker-compose.dev.yml"
+        mode: "0644"
+
+    - name: Copy nginx file
+      ansible.builtin.copy:
+        src: "{{ nginx_file }}"
+        dest: "{{ deploy_path }}/nginx/auth.conf"
+        mode: "0644"
+
+    - name: Update BACKEND_IMAGE_TAG in .env
+      ansible.builtin.lineinfile:
+        path: "{{ deploy_path }}/.env"
+        regexp: "^BACKEND_IMAGE_TAG="
+        line: "BACKEND_IMAGE_TAG={{ (lookup('env', 'GITHUB_SHA') | truncate(8, true, '') }}"
+        create: no
+        mode: "0600"
+
+    - name: Down Auth
+      community.docker.docker_compose_v2:
+        project_src: "{{ deploy_path }}"
+        state: absent
+
+    - name: Build and Up Auth
+      community.docker.docker_compose_v2:
+        project_src: "{{ deploy_path }}"
+        state: present
+        build: always
+        pull: always
+      environment:
+        PG_USER: "{{ lookup('env', 'PG_USER') }}"
+        PG_PASSWORD: "{{ lookup('env', 'PG_PASSWORD') }}"
+        PG_HOST: "{{ lookup('env', 'PG_HOST') }}"
+        PG_PORT: "{{ lookup('env', 'PG_PORT') }}"
+        PG_DBNAME: "{{ lookup('env', 'PG_DBNAME') }}"
+        TOKEN_SECRET: "{{ lookup('env', 'TOKEN_SECRET') }}"
+        DB_MAX_CONNS: "{{ lookup('env', 'DB_MAX_CONNS') }}"
+        DB_CONN_TIMEOUT: "{{ lookup('env', 'DB_CONN_TIMEOUT') }}"
+        MIGRATIONS_PATH: "{{ lookup('env', 'MIGRATIONS_PATH') }}"
+        REDIS_HOST: "{{ lookup('env', 'REDIS_HOST') }}"
+        REDIS_PORT: "{{ lookup('env', 'REDIS_PORT') }}"
+        OAUTH_GOOGLE_CLIENT_ID: "{{ lookup('env', 'OAUTH_GOOGLE_CLIENT_ID') }}"
+        OAUTH_GOOGLE_CLIENT_SECRET: "{{ lookup('env', 'OAUTH_GOOGLE_CLIENT_SECRET') }}"
+        OAUTH_GITHUB_CLIENT_ID: "{{ lookup('env', 'OAUTH_GITHUB_CLIENT_ID') }}"
+        OAUTH_GITHUB_CLIENT_SECRET: "{{ lookup('env', 'OAUTH_GITHUB_CLIENT_SECRET') }}"
+        
+
+  
+    - name: Run Database Migrations
+      community.docker.docker_compose_v2:
+        container: go-auth
+        command: sh -c "/app/migrate up && /app/go-auth"
