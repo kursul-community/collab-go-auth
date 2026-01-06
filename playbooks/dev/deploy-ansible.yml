@@ -31,7 +31,7 @@
     - name: Extract registry and image name from backend_image
       set_fact:
         registry: "{{ backend_image.split('/')[0] if backend_image and '/' in backend_image else 'ghcr.io' }}"
-        image_name: "{{ backend_image.split('/')[1].split(':')[0] if backend_image and '/' in backend_image and ':' in backend_image.split('/')[1] else (backend_image.split('/')[1] if backend_image and '/' in backend_image else '') }}"
+        image_name: "{{ backend_image.split('/')[1:] | join('/') | regex_replace(':[^:]*$', '') if '/' in backend_image else backend_image.split(':')[0] }}"
 
     - name: Down Auth
       community.docker.docker_compose_v2:
