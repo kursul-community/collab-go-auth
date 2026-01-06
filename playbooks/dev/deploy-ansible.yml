@@ -39,14 +39,14 @@
     - name: Down Auth
       community.docker.docker_compose_v2:
         project_src: "{{ deploy_path }}"
-        project_files:
+        files:
           - docker-compose.dev.yml
         state: absent
 
     - name: Build and Up Auth
       community.docker.docker_compose_v2:
         project_src: "{{ deploy_path }}"
-        project_files:
+        files:
           - docker-compose.dev.yml
         state: present
         build: always
@@ -73,7 +73,7 @@
     - name: Run Database Migrations
       community.docker.docker_compose_v2:
         project_src: "{{ deploy_path }}"
-        project_files:
+        files:
           - docker-compose.dev.yml
         container: go-auth
         command: sh -c "/app/migrate up && /app/go-auth"
