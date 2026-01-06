@@ -1,7 +1,7 @@
 ---
 - name: Deploy Auth
   hosts: develop
-  become: no
+  become: yes
   remote_user: collab-user
 
   tasks: 
