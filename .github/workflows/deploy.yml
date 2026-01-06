@@ -54,8 +54,8 @@ jobs:
         id: build
         uses: docker/build-push-action@v5
         with:
-          context: .
-          file: ./Dockerfile
+          context: ./collab-go-auth
+          file: ./collab-go-auth/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -104,4 +104,5 @@ jobs:
           ansible-playbook \
             -i inventories/dev/inventory.ini \
             playbooks/dev/deploy-ansible.yml \
-            -e "backend_image=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+            -e "backend_image=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" \
+            -v
