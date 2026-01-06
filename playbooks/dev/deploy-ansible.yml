@@ -28,10 +28,11 @@
     #     dest: "{{ deploy_path }}/nginx/auth.conf"
     #     mode: "0644"
 
-    - name: Extract registry and image name from backend_image
+    - name: Extract registry, image name and tag from backend_image
       set_fact:
         registry: "{{ backend_image.split('/')[0] if backend_image and '/' in backend_image else 'ghcr.io' }}"
         image_name: "{{ backend_image.split('/')[1:] | join('/') | regex_replace(':[^:]*$', '') if '/' in backend_image else backend_image.split(':')[0] }}"
+        image_tag: "{{ backend_image.split(':')[-1] if ':' in backend_image else 'latest' }}"
 
     - name: Login to GitHub Container Registry
       community.docker.docker_login:
@@ -49,7 +50,7 @@
       environment:
         REGISTRY: "{{ registry }}"
         IMAGE_NAME: "{{ image_name }}"
-        BACKEND_IMAGE_TAG: "{{ lookup('env', 'GITHUB_SHA')[:8] }}"
+        BACKEND_IMAGE_TAG: "{{ image_tag }}"
         PG_USER: "{{ lookup('env', 'PG_USER') }}"
         PG_PASSWORD: "{{ lookup('env', 'PG_PASSWORD') }}"
         PG_HOST: "{{ lookup('env', 'PG_HOST') }}"
@@ -76,7 +77,7 @@
       environment:
         REGISTRY: "{{ registry }}"
         IMAGE_NAME: "{{ image_name }}"
-        BACKEND_IMAGE_TAG: "{{ lookup('env', 'GITHUB_SHA')[:8] }}"
+        BACKEND_IMAGE_TAG: "{{ image_tag }}"
         PG_USER: "{{ lookup('env', 'PG_USER') }}"
         PG_PASSWORD: "{{ lookup('env', 'PG_PASSWORD') }}"
         PG_HOST: "{{ lookup('env', 'PG_HOST') }}"
@@ -103,7 +104,7 @@
       environment:
         REGISTRY: "{{ registry }}"
         IMAGE_NAME: "{{ image_name }}"
-        BACKEND_IMAGE_TAG: "{{ lookup('env', 'GITHUB_SHA')[:8] }}"
+        BACKEND_IMAGE_TAG: "{{ image_tag }}"
         PG_USER: "{{ lookup('env', 'PG_USER') }}"
         PG_PASSWORD: "{{ lookup('env', 'PG_PASSWORD') }}"
         PG_HOST: "{{ lookup('env', 'PG_HOST') }}"
