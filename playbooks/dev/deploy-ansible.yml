@@ -32,7 +32,7 @@
       ansible.builtin.lineinfile:
         path: "{{ deploy_path }}/.env"
         regexp: "^BACKEND_IMAGE_TAG="
-        line: "BACKEND_IMAGE_TAG={{ (lookup('env', 'GITHUB_SHA') | truncate(8, true, '') }}"
+        line: "BACKEND_IMAGE_TAG={{ lookup('env', 'GITHUB_SHA')[:8] }}"
         create: no
         mode: "0600"
 
