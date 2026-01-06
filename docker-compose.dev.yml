@@ -31,9 +31,7 @@ services:
       retries: 5
 
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ${REGISTRY}/${IMAGE_NAME}:${BACKEND_IMAGE_TAG}
     container_name: go-auth
     environment:
       PG_USER: ${PG_USER}
