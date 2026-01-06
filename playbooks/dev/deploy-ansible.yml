@@ -1,7 +1,7 @@
 ---
 - name: Deploy Auth
   hosts: develop
-  become: yes
+  become: no
   remote_user: collab-user
 
   tasks: 
@@ -18,8 +18,8 @@
         path: "{{ deploy_path }}/infra"
         state: directory
         mode: "0755"
-        owner: collab-user
-        group: collab-user
+        # owner: collab-user
+        # group: collab-user
 
     - name: Copy docker compose file
       ansible.builtin.copy:
@@ -32,16 +32,16 @@
         path: "{{ deploy_path }}/config"
         state: directory
         mode: "0755"
-        owner: collab-user
-        group: collab-user
+        # owner: collab-user
+        # group: collab-user
 
     - name: Copy config file
       ansible.builtin.copy:
         src: ../../config/config.yaml
         dest: "{{ deploy_path }}/config/config.yaml"
         mode: "0644"
-        owner: collab-user
-        group: collab-user
+        # owner: collab-user
+        # group: collab-user
 
     # - name: Copy nginx file
     #   ansible.builtin.copy:
