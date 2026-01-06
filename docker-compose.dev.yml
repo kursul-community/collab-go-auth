@@ -60,6 +60,11 @@ services:
     ports:
       - "60051:60051"  # gRPC
       - "8081:8080"    # HTTP REST Gateway
+    command: >
+      sh -c "
+        /app/migrate up &&
+        /app/go-auth
+      "
 
 volumes:
   postgres_data:
