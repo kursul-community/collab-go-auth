@@ -14,6 +14,7 @@ import (
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 
@@ -137,9 +138,35 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 		runtime.DefaultHTTPErrorHandler(ctx, mux, marshaler, w, r, err)
 	}
 
-	// Создаем gRPC Gateway mux с кастомным error handler
+	// Функция для добавления Origin/Host в gRPC metadata
+	metadataFunc := func(ctx context.Context, r *http.Request) metadata.MD {
+		md := metadata.MD{}
+		
+		// Извлекаем Origin или формируем из Host
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			// Если Origin нет, формируем из Host
+			scheme := "http"
+			if r.TLS != nil {
+				scheme = "https"
+			}
+			host := r.Host
+			if host != "" {
+				origin = fmt.Sprintf("%s://%s", scheme, host)
+			}
+		}
+		
+		if origin != "" {
+			md.Set("x-frontend-origin", origin)
+		}
+		
+		return md
+	}
+
+	// Создаем gRPC Gateway mux с кастомным error handler и metadata функцией
 	grpcMux := runtime.NewServeMux(
 		runtime.WithErrorHandler(customErrorHandler),
+		runtime.WithMetadata(metadataFunc),
 	)
 
 	// Настройки для подключения к gRPC серверу

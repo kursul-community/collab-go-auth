@@ -234,7 +234,15 @@ func (s *AuthServer) RestorePasswordBegin(ctx context.Context, req *pb.RestorePa
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	err := s.auth.RestorePasswordBegin(req.Email)
+	// Извлекаем frontend URL из metadata (передается из gateway)
+	frontendURL := ""
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		if origins := md.Get("x-frontend-origin"); len(origins) > 0 {
+			frontendURL = origins[0]
+		}
+	}
+
+	err := s.auth.RestorePasswordBegin(req.Email, frontendURL)
 	if err != nil {
 		// Для безопасности не раскрываем детали ошибки
 		return nil, status.Error(codes.Internal, "failed to process request")
