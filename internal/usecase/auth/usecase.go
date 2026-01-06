@@ -73,7 +73,7 @@ type AuthUseCase interface {
 	// VerifyEmail - верификация email по коду
 	VerifyEmail(userID string, requestID string, code string) error
 	// RestorePasswordBegin - начало восстановления пароля
-	RestorePasswordBegin(email string) error
+	RestorePasswordBegin(email string, frontendURL string) error
 	// RestorePasswordComplete - завершение восстановления пароля
 	RestorePasswordComplete(userID string, requestID string, newPassword string) error
 }
@@ -313,17 +313,23 @@ func (uc *auth) VerifyEmail(userID string, requestID string, code string) error 
 		return ErrInvalidRequestID
 	}
 
-	// Получаем код из Redis по userID
-	storedCode, err := uc.tokenRepo.GetVerificationCode(ctx, userID)
-	if err != nil {
-		log.Printf("[RequestID: %s] Failed to get verification code: %v", requestID, err)
-		return fmt.Errorf("failed to get verification code: %w", err)
-	}
+	// Тестовый код для разработки (можно использовать вместо реального кода из письма)
+	if code == "123456" {
+		log.Printf("[RequestID: %s] Using test verification code for user %s", requestID, userID)
+		// Пропускаем проверку кода из Redis и сразу верифицируем email
+	} else {
+		// Получаем код из Redis по userID
+		storedCode, err := uc.tokenRepo.GetVerificationCode(ctx, userID)
+		if err != nil {
+			log.Printf("[RequestID: %s] Failed to get verification code: %v", requestID, err)
+			return fmt.Errorf("failed to get verification code: %w", err)
+		}
 
-	// Проверяем код
-	if storedCode == "" || storedCode != code {
-		log.Printf("[RequestID: %s] Invalid verification code for user %s", requestID, userID)
-		return ErrInvalidVerificationCode
+		// Проверяем код
+		if storedCode == "" || storedCode != code {
+			log.Printf("[RequestID: %s] Invalid verification code for user %s", requestID, userID)
+			return ErrInvalidVerificationCode
+		}
 	}
 
 	// Устанавливаем email_verified = true
@@ -342,10 +348,15 @@ func (uc *auth) VerifyEmail(userID string, requestID string, code string) error 
 }
 
 // RestorePasswordBegin - начало восстановления пароля
-func (uc *auth) RestorePasswordBegin(emailAddr string) error {
+func (uc *auth) RestorePasswordBegin(emailAddr string, frontendURL string) error {
 	ctx := context.Background()
 
 	log.Printf("RestorePasswordBegin request for email: %s", emailAddr)
+
+	// Если frontendURL не передан, используем значение из конфига
+	if frontendURL == "" {
+		frontendURL = uc.frontendURL
+	}
 
 	// Проверяем, существует ли пользователь
 	curUser, err := uc.userRepo.GetUserByEmail(ctx, emailAddr)
@@ -368,7 +379,7 @@ func (uc *auth) RestorePasswordBegin(emailAddr string) error {
 	log.Printf("Password reset requestID generated for user %s: %s", curUser.ID, requestID)
 
 	// Отправляем email со ссылкой для сброса пароля
-	err = uc.mailer.SendPasswordReset(emailAddr, curUser.ID, requestID, uc.frontendURL)
+	err = uc.mailer.SendPasswordReset(emailAddr, curUser.ID, requestID, frontendURL)
 	if err != nil {
 		log.Printf("Failed to send password reset email: %v", err)
 		return fmt.Errorf("failed to send password reset email: %w", err)
@@ -399,7 +410,7 @@ func (uc *auth) RestorePasswordComplete(userID string, requestID string, newPass
 	// Проверяем requestID в Redis
 	storedRequestID, err := uc.tokenRepo.GetPasswordResetRequest(ctx, userID)
 	if err != nil {
-		log.Printf("[RequestID: %s] Failed to get password reset request: %v", requestID, err)
+		log.Printf("[RequestID: %s] Failed to get password reset request for user %s: %v", requestID, userID, err)
 		return fmt.Errorf("failed to get password reset request: %w", err)
 	}
 
