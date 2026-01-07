@@ -34,8 +34,7 @@
         group: collab-user
         state: directory
         mode: "0755"
-        # owner: collab-user
-        # group: collab-user
+      become: yes
 
     - name: Copy config file
       ansible.builtin.copy:
@@ -44,8 +43,7 @@
         owner: collab-user
         group: collab-user
         mode: "0644"
-        # owner: collab-user
-        # group: collab-user
+      become: yes
 
     # - name: Copy nginx file
     #   ansible.builtin.copy:
