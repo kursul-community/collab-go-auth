@@ -3,11 +3,13 @@ package grpcauth
 import (
 	"context"
 	"errors"
+	"log"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	pb "go-auth/gen/auth"
 	usecase "go-auth/internal/usecase/auth"
@@ -84,10 +86,37 @@ func (s *AuthServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Login
 			grpc.SetHeader(ctx, md)
 			
 			if errors.Is(loginErr.Err, usecase.ErrUserNotActive) {
-				return nil, status.Error(codes.PermissionDenied, "User account is not active")
+				// Создаем статус с Struct в details (только requestId и userId)
+				st := status.New(codes.PermissionDenied, "User account is not active")
+				detailsStruct, err := structpb.NewStruct(map[string]interface{}{
+					"requestId": loginErr.RequestID,
+					"userId":    loginErr.UserID,
+				})
+				if err == nil {
+					st, _ = st.WithDetails(detailsStruct)
+				}
+				return nil, st.Err()
 			}
 			if errors.Is(loginErr.Err, usecase.ErrEmailNotVerified) {
-				return nil, status.Error(codes.PermissionDenied, "Email not verified")
+				// Отправляем код верификации на почту
+				if err := s.auth.ResendVerificationEmail(loginErr.UserID, loginErr.RequestID); err != nil {
+					// Логируем ошибку, но продолжаем возвращать ошибку с userId и requestId
+					// Это важно, чтобы фронтенд получил необходимые данные даже если отправка не удалась
+					log.Printf("Failed to resend verification email for user %s (requestID: %s): %v", loginErr.UserID, loginErr.RequestID, err)
+				} else {
+					log.Printf("Verification code resent for user %s (requestID: %s)", loginErr.UserID, loginErr.RequestID)
+				}
+				
+				// Создаем статус с Struct в details (только requestId и userId)
+				st := status.New(codes.PermissionDenied, "Email not verified")
+				detailsStruct, err := structpb.NewStruct(map[string]interface{}{
+					"requestId": loginErr.RequestID,
+					"userId":    loginErr.UserID,
+				})
+				if err == nil {
+					st, _ = st.WithDetails(detailsStruct)
+				}
+				return nil, st.Err()
 			}
 		}
 		
@@ -205,7 +234,15 @@ func (s *AuthServer) RestorePasswordBegin(ctx context.Context, req *pb.RestorePa
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	err := s.auth.RestorePasswordBegin(req.Email)
+	// Извлекаем frontend URL из metadata (передается из gateway)
+	frontendURL := ""
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		if origins := md.Get("x-frontend-origin"); len(origins) > 0 {
+			frontendURL = origins[0]
+		}
+	}
+
+	err := s.auth.RestorePasswordBegin(req.Email, frontendURL)
 	if err != nil {
 		// Для безопасности не раскрываем детали ошибки
 		return nil, status.Error(codes.Internal, "failed to process request")
