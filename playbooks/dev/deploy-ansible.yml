@@ -30,20 +30,14 @@
     - name: Ensure config directory exists
       ansible.builtin.file:
         path: "{{ deploy_path }}/config"
-        owner: collab-user
-        group: collab-user
         state: directory
         mode: "0755"
-      become: yes
 
     - name: Copy config file
       ansible.builtin.copy:
         src: ../../config/config.yaml
         dest: "{{ deploy_path }}/config/config.yaml"
-        owner: collab-user
-        group: collab-user
         mode: "0644"
-      become: yes
 
     # - name: Copy nginx file
     #   ansible.builtin.copy:
