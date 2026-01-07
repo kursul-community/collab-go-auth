@@ -39,6 +39,18 @@
         dest: "{{ deploy_path }}/config/config.yaml"
         mode: "0644"
 
+    - name: Ensure migrations directory exists
+      ansible.builtin.file:
+        path: "{{ deploy_path }}/migrations"
+        state: directory
+        mode: "0755"
+
+    - name: Copy migrations directory
+      ansible.builtin.copy:
+        src: ../../migrations/
+        dest: "{{ deploy_path }}/migrations/"
+        mode: "0644"
+
     # - name: Copy nginx file
     #   ansible.builtin.copy:
     #     src: "{{ nginx_file }}"
@@ -103,7 +115,7 @@
         TOKEN_SECRET: "{{ lookup('env', 'TOKEN_SECRET') }}"
         DB_MAX_CONNS: "{{ lookup('env', 'DB_MAX_CONNS') }}"
         DB_CONN_TIMEOUT: "{{ lookup('env', 'DB_CONN_TIMEOUT') }}"
-        MIGRATIONS_PATH: "{{ lookup('env', 'MIGRATIONS_PATH') }}"
+        MIGRATIONS_PATH: "{{ lookup('env', 'MIGRATIONS_PATH') | default('/app/migrations', true) }}"
         REDIS_HOST: "{{ lookup('env', 'REDIS_HOST') }}"
         REDIS_PORT: "{{ lookup('env', 'REDIS_PORT') }}"
         # OAUTH_GOOGLE_CLIENT_ID: "{{ lookup('env', 'OAUTH_GOOGLE_CLIENT_ID') }}"
