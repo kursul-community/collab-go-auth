@@ -186,6 +186,40 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 	// Создаем основной HTTP mux
 	mainMux := http.NewServeMux()
 
+	// GET /api/v1/auth/position-info - список позиций
+	// Регистрируем его отдельно, чтобы он был доступен даже если OAuth выключен
+	mainMux.HandleFunc("/api/v1/auth/position-info", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet || r.Method == http.MethodOptions {
+			if oauthHandler != nil {
+				oauthHandler.GetPositionInfo(w, r)
+			} else {
+				// Запасной вариант, если handler не проброшен
+				positions := []string{
+					"Frontend Developer",
+					"Backend Developer",
+					"Full-Stack Developer",
+					"Mobile Developer",
+					"DevOps Engineer",
+					"QA Engineer",
+					"Data Scientist",
+					"Machine Learning Engineer",
+					"UI/UX Designer",
+					"Product Designer",
+					"Product Manager",
+					"Project Manager",
+					"Business Analyst",
+					"Founder / Co-Founder",
+				}
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]interface{}{
+					"position": positions,
+				})
+			}
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
 	// Регистрируем OAuth роуты (если OAuth включен)
 	if oauthHandler != nil {
 		// GET /api/v1/auth/oauth/providers - список провайдеров

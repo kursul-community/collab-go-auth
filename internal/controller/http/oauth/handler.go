@@ -27,6 +27,11 @@ func NewHandler(oauth usecase.OAuthUseCase, frontendURL string) *Handler {
 // GetAuthURL обрабатывает GET /api/v1/auth/oauth/{provider}
 // Возвращает URL для редиректа на страницу авторизации провайдера
 func (h *Handler) GetAuthURL(w http.ResponseWriter, r *http.Request) {
+	if h.oauth == nil {
+		writeError(w, http.StatusServiceUnavailable, "OAuth is not configured")
+		return
+	}
+
 	// Получаем имя провайдера из URL
 	provider := extractProvider(r.URL.Path)
 	if provider == "" {
@@ -54,6 +59,11 @@ func (h *Handler) GetAuthURL(w http.ResponseWriter, r *http.Request) {
 // Callback обрабатывает GET /api/v1/auth/oauth/{provider}/callback
 // Вызывается OAuth провайдером после авторизации пользователя
 func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
+	if h.oauth == nil {
+		redirectWithError(w, r, h.frontendURL, "not_configured", "OAuth is not configured")
+		return
+	}
+
 	// Получаем имя провайдера из URL
 	provider := extractProviderFromCallback(r.URL.Path)
 	if provider == "" {
@@ -100,10 +110,41 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 // GetProviders обрабатывает GET /api/v1/auth/oauth/providers
 // Возвращает список доступных OAuth провайдеров
 func (h *Handler) GetProviders(w http.ResponseWriter, r *http.Request) {
+	if h.oauth == nil {
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"providers": []interface{}{},
+		})
+		return
+	}
+
 	providers := h.oauth.GetProviders()
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"providers": providers,
+	})
+}
+
+// GetPositionInfo обрабатывает GET /api/v1/auth/position-info
+func (h *Handler) GetPositionInfo(w http.ResponseWriter, r *http.Request) {
+	positions := []string{
+		"Frontend Developer",
+		"Backend Developer",
+		"Full-Stack Developer",
+		"Mobile Developer",
+		"DevOps Engineer",
+		"QA Engineer",
+		"Data Scientist",
+		"Machine Learning Engineer",
+		"UI/UX Designer",
+		"Product Designer",
+		"Product Manager",
+		"Project Manager",
+		"Business Analyst",
+		"Founder / Co-Founder",
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"position": positions,
 	})
 }
 
