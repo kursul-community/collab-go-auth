@@ -78,20 +78,23 @@ func Run(cfg *config.Config, devMode bool) {
 
 	// Создаем OAuth менеджер и usecase
 	oauthManager := oauthadapter.NewManager(&cfg.OAuth)
-	var oauthHandler *oauthhttp.Handler
+	var oauthUseCase usecase.OAuthUseCase
 
 	// Проверяем, есть ли включенные OAuth провайдеры
 	enabledProviders := cfg.GetEnabledOAuthProviders()
 	if len(enabledProviders) > 0 {
 		baseAuth := usecase.GetBaseAuth(authUseCase)
 		if baseAuth != nil {
-			oauthUseCase := usecase.NewOAuthUseCase(baseAuth, oauthManager, cfg.OAuth.StateTTL)
-			oauthHandler = oauthhttp.NewHandler(oauthUseCase, cfg.OAuth.FrontendCallbackURL)
+			oauthUseCase = usecase.NewOAuthUseCase(baseAuth, oauthManager, cfg.OAuth.StateTTL)
 			logger.Printf("OAuth initialized with providers: %v", enabledProviders)
 		}
 	} else {
 		logger.Printf("OAuth disabled (no enabled providers)")
 	}
+
+	// Всегда создаем OAuth handler, так как он может обслуживать не только OAuth роуты,
+	// но и общие эндпоинты (например, /position-info)
+	oauthHandler := oauthhttp.NewHandler(oauthUseCase, cfg.OAuth.FrontendCallbackURL)
 
 	// Создаем gRPC-сервер
 	grpcServer := grpc.NewServer(
