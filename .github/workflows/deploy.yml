@@ -102,6 +102,7 @@ jobs:
         env:
           GITHUB_SHA: ${{ github.sha }}
           ANSIBLE_HOST_KEY_CHECKING: False
+          ANSIBLE_STDOUT_CALLBACK: yaml
           # Organization Variables
           PG_HOST: ${{ vars.PG_HOST }}
           PG_PORT: ${{ vars.PG_PORT }}
