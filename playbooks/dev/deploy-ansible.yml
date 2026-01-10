@@ -1,0 +1,115 @@
+---
+- name: Deploy Auth
+  hosts: develop
+  become: no
+  remote_user: collab-user
+
+  tasks: 
+    - name: Ensure deployment directory exists
+      ansible.builtin.file:
+        path: "{{ deploy_path }}"
+        state: directory
+        mode: "0755"
+
+      
+    - name: Ensure infra directory 
+      ansible.builtin.file:
+        path: "{{ deploy_path }}/infra"
+        state: directory
+        mode: "0755"
+        # owner: collab-user
+        # group: collab-user
+
+    - name: Copy docker compose file
+      ansible.builtin.copy:
+        src: "{{ compose_file }}"
+        dest: "{{ deploy_path }}/docker-compose.dev.yml"
+        mode: "0644"
+
+    - name: Ensure config directory exists
+      ansible.builtin.file:
+        path: "{{ deploy_path }}/config"
+        state: directory
+        mode: "0755"
+        # owner: collab-user
+        # group: collab-user
+
+    - name: Copy config file
+      ansible.builtin.copy:
+        src: ../../config/config.yaml
+        dest: "{{ deploy_path }}/config/config.yaml"
+        mode: "0644"
+        # owner: collab-user
+        # group: collab-user
+
+    # - name: Copy nginx file
+    #   ansible.builtin.copy:
+    #     src: "{{ nginx_file }}"
+    #     dest: "{{ deploy_path }}/nginx/auth.conf"
+    #     mode: "0644"
+
+    - name: Extract registry, image name and tag from backend_image
+      set_fact:
+        registry: "{{ backend_image.split('/')[0] if backend_image and '/' in backend_image else 'ghcr.io' }}"
+        image_name: "{{ backend_image.split('/')[1:] | join('/') | regex_replace(':[^:]*$', '') if '/' in backend_image else backend_image.split(':')[0] }}"
+        image_tag: "{{ backend_image.split(':')[-1] if ':' in backend_image else 'latest' }}"
+
+    - name: Login to GitHub Container Registry
+      community.docker.docker_login:
+        registry_url: "{{ registry }}"
+        username: "{{ lookup('env', 'GHCR_USERNAME') | default('github', true) }}"
+        password: "{{ lookup('env', 'GHCR_TOKEN') }}"
+      when: registry == 'ghcr.io' and lookup('env', 'GHCR_TOKEN') is defined
+
+    - name: Down Auth
+      community.docker.docker_compose_v2:
+        project_src: "{{ deploy_path }}"
+        files:
+          - docker-compose.dev.yml
+        state: absent
+      environment:
+        REGISTRY: "{{ registry }}"
+        IMAGE_NAME: "{{ image_name }}"
+        BACKEND_IMAGE_TAG: "{{ image_tag }}"
+        PG_USER: "{{ lookup('env', 'PG_USER') }}"
+        PG_PASSWORD: "{{ lookup('env', 'PG_PASSWORD') }}"
+        PG_HOST: "{{ lookup('env', 'PG_HOST') }}"
+        PG_PORT: "{{ lookup('env', 'PG_PORT') }}"
+        PG_DBNAME: "{{ lookup('env', 'PG_DBNAME') }}"
+        TOKEN_SECRET: "{{ lookup('env', 'TOKEN_SECRET') }}"
+        DB_MAX_CONNS: "{{ lookup('env', 'DB_MAX_CONNS') }}"
+        DB_CONN_TIMEOUT: "{{ lookup('env', 'DB_CONN_TIMEOUT') }}"
+        MIGRATIONS_PATH: "{{ lookup('env', 'MIGRATIONS_PATH') }}"
+        REDIS_HOST: "{{ lookup('env', 'REDIS_HOST') }}"
+        REDIS_PORT: "{{ lookup('env', 'REDIS_PORT') }}"
+        # OAUTH_GOOGLE_CLIENT_ID: "{{ lookup('env', 'OAUTH_GOOGLE_CLIENT_ID') }}"
+        # OAUTH_GOOGLE_CLIENT_SECRET: "{{ lookup('env', 'OAUTH_GOOGLE_CLIENT_SECRET') }}"
+        # OAUTH_GITHUB_CLIENT_ID: "{{ lookup('env', 'OAUTH_GITHUB_CLIENT_ID') }}"
+        # OAUTH_GITHUB_CLIENT_SECRET: "{{ lookup('env', 'OAUTH_GITHUB_CLIENT_SECRET') }}"
+
+    - name: Build and Up Auth
+      community.docker.docker_compose_v2:
+        project_src: "{{ deploy_path }}"
+        files:
+          - docker-compose.dev.yml
+        state: present
+        pull: always
+      environment:
+        REGISTRY: "{{ registry }}"
+        IMAGE_NAME: "{{ image_name }}"
+        BACKEND_IMAGE_TAG: "{{ image_tag }}"
+        PG_USER: "{{ lookup('env', 'PG_USER') }}"
+        PG_PASSWORD: "{{ lookup('env', 'PG_PASSWORD') }}"
+        PG_HOST: "{{ lookup('env', 'PG_HOST') }}"
+        PG_PORT: "{{ lookup('env', 'PG_PORT') }}"
+        PG_DBNAME: "{{ lookup('env', 'PG_DBNAME') }}"
+        TOKEN_SECRET: "{{ lookup('env', 'TOKEN_SECRET') }}"
+        DB_MAX_CONNS: "{{ lookup('env', 'DB_MAX_CONNS') }}"
+        DB_CONN_TIMEOUT: "{{ lookup('env', 'DB_CONN_TIMEOUT') }}"
+        MIGRATIONS_PATH: "{{ lookup('env', 'MIGRATIONS_PATH') }}"
+        REDIS_HOST: "{{ lookup('env', 'REDIS_HOST') }}"
+        REDIS_PORT: "{{ lookup('env', 'REDIS_PORT') }}"
+        # OAUTH_GOOGLE_CLIENT_ID: "{{ lookup('env', 'OAUTH_GOOGLE_CLIENT_ID') }}"
+        # OAUTH_GOOGLE_CLIENT_SECRET: "{{ lookup('env', 'OAUTH_GOOGLE_CLIENT_SECRET') }}"
+        # OAUTH_GITHUB_CLIENT_ID: "{{ lookup('env', 'OAUTH_GITHUB_CLIENT_ID') }}"
+        # OAUTH_GITHUB_CLIENT_SECRET: "{{ lookup('env', 'OAUTH_GITHUB_CLIENT_SECRET') }}"
