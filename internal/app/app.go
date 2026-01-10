@@ -93,7 +93,7 @@ func Run(cfg *config.Config, devMode bool) {
 	}
 
 	// Всегда создаем OAuth handler, так как он может обслуживать не только OAuth роуты,
-	// но и общие эндпоинты (например, /position-info)
+	// но и общие эндпоинты
 	oauthHandler := oauthhttp.NewHandler(oauthUseCase, cfg.OAuth.FrontendCallbackURL)
 
 	// Создаем gRPC-сервер

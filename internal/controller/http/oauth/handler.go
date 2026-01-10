@@ -124,30 +124,6 @@ func (h *Handler) GetProviders(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// GetPositionInfo обрабатывает GET /api/v1/auth/position-info
-func (h *Handler) GetPositionInfo(w http.ResponseWriter, r *http.Request) {
-	positions := []string{
-		"Frontend Developer",
-		"Backend Developer",
-		"Full-Stack Developer",
-		"Mobile Developer",
-		"DevOps Engineer",
-		"QA Engineer",
-		"Data Scientist",
-		"Machine Learning Engineer",
-		"UI/UX Designer",
-		"Product Designer",
-		"Product Manager",
-		"Project Manager",
-		"Business Analyst",
-		"Founder / Co-Founder",
-	}
-
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"position": positions,
-	})
-}
-
 // extractProvider извлекает имя провайдера из пути /api/v1/auth/oauth/{provider}
 func extractProvider(path string) string {
 	// Удаляем префикс

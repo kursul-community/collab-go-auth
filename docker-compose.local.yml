@@ -61,7 +61,7 @@ services:
       - ./config:/app/config
     ports:
       - "60051:60051"  # gRPC
-      - "8081:8080"    # HTTP REST Gateway
+      - "8085:8080"    # HTTP REST Gateway (Internal 8080 from config.yaml)
     command: >
       sh -c "
         /app/migrate up &&
