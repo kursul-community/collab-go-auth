@@ -10,63 +10,37 @@
         path: "{{ deploy_path }}"
         state: directory
         mode: "0755"
-        owner: collab-user
-        group: collab-user
-      become: yes
+
       
     - name: Ensure infra directory 
       ansible.builtin.file:
         path: "{{ deploy_path }}/infra"
         state: directory
         mode: "0755"
-        owner: collab-user
-        group: collab-user
-      become: yes
+        # owner: collab-user
+        # group: collab-user
 
     - name: Copy docker compose file
       ansible.builtin.copy:
         src: "{{ compose_file }}"
         dest: "{{ deploy_path }}/docker-compose.dev.yml"
         mode: "0644"
-        owner: collab-user
-        group: collab-user
-      become: yes
 
     - name: Ensure config directory exists
       ansible.builtin.file:
         path: "{{ deploy_path }}/config"
         state: directory
         mode: "0755"
-        owner: collab-user
-        group: collab-user
-      become: yes
+        # owner: collab-user
+        # group: collab-user
 
     - name: Copy config file
       ansible.builtin.copy:
         src: ../../config/config.yaml
         dest: "{{ deploy_path }}/config/config.yaml"
         mode: "0644"
-        owner: collab-user
-        group: collab-user
-      become: yes
-
-    - name: Ensure migrations directory exists
-      ansible.builtin.file:
-        path: "{{ deploy_path }}/migrations"
-        state: directory
-        mode: "0755"
-        owner: collab-user
-        group: collab-user
-      become: yes
-
-    - name: Copy migrations directory
-      ansible.builtin.copy:
-        src: ../../migrations/
-        dest: "{{ deploy_path }}/migrations/"
-        mode: "0644"
-        owner: collab-user
-        group: collab-user
-      become: yes
+        # owner: collab-user
+        # group: collab-user
 
     # - name: Copy nginx file
     #   ansible.builtin.copy:
@@ -132,7 +106,7 @@
         TOKEN_SECRET: "{{ lookup('env', 'TOKEN_SECRET') }}"
         DB_MAX_CONNS: "{{ lookup('env', 'DB_MAX_CONNS') }}"
         DB_CONN_TIMEOUT: "{{ lookup('env', 'DB_CONN_TIMEOUT') }}"
-        MIGRATIONS_PATH: "{{ lookup('env', 'MIGRATIONS_PATH') | default('/app/migrations', true) }}"
+        MIGRATIONS_PATH: "{{ lookup('env', 'MIGRATIONS_PATH') }}"
         REDIS_HOST: "{{ lookup('env', 'REDIS_HOST') }}"
         REDIS_PORT: "{{ lookup('env', 'REDIS_PORT') }}"
         # OAUTH_GOOGLE_CLIENT_ID: "{{ lookup('env', 'OAUTH_GOOGLE_CLIENT_ID') }}"
