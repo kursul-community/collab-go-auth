@@ -12,44 +12,61 @@
         mode: "0755"
         owner: collab-user
         group: collab-user
+      become: yes
       
     - name: Ensure infra directory 
       ansible.builtin.file:
         path: "{{ deploy_path }}/infra"
         state: directory
         mode: "0755"
-        # owner: collab-user
-        # group: collab-user
+        owner: collab-user
+        group: collab-user
+      become: yes
 
     - name: Copy docker compose file
       ansible.builtin.copy:
         src: "{{ compose_file }}"
         dest: "{{ deploy_path }}/docker-compose.dev.yml"
         mode: "0644"
+        owner: collab-user
+        group: collab-user
+      become: yes
 
     - name: Ensure config directory exists
       ansible.builtin.file:
         path: "{{ deploy_path }}/config"
         state: directory
         mode: "0755"
+        owner: collab-user
+        group: collab-user
+      become: yes
 
     - name: Copy config file
       ansible.builtin.copy:
         src: ../../config/config.yaml
         dest: "{{ deploy_path }}/config/config.yaml"
         mode: "0644"
+        owner: collab-user
+        group: collab-user
+      become: yes
 
     - name: Ensure migrations directory exists
       ansible.builtin.file:
         path: "{{ deploy_path }}/migrations"
         state: directory
         mode: "0755"
+        owner: collab-user
+        group: collab-user
+      become: yes
 
     - name: Copy migrations directory
       ansible.builtin.copy:
         src: ../../migrations/
         dest: "{{ deploy_path }}/migrations/"
         mode: "0644"
+        owner: collab-user
+        group: collab-user
+      become: yes
 
     # - name: Copy nginx file
     #   ansible.builtin.copy:

@@ -48,7 +48,7 @@ jobs:
           tags: |
             type=raw,value=${{ github.sha }}
             type=raw,value=dev-latest
-            type=sha,prefix={{branch}}-
+            type=sha
       
       - name: Build and push Docker image
         id: build
