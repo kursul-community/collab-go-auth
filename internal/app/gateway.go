@@ -231,7 +231,7 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 	return nil
 }
 
-// corsMiddleware - добавляет CORS заголовки для фронтенда
+// corsMiddleware - добавляет CORS заголовки для фронта
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
