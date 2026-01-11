@@ -49,10 +49,11 @@ func (h *Handler) GetAuthURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Возвращаем JSON с URL и state
+	// Возвращаем JSON с URL, state и displayName
 	writeJSON(w, http.StatusOK, map[string]string{
-		"auth_url": authURL,
-		"state":    state,
+		"displayName": provider,
+		"auth_url":    authURL,
+		"state":       state,
 	})
 }
 
@@ -107,23 +108,6 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 	redirectWithTokens(w, r, h.frontendURL, accessToken, refreshToken)
 }
 
-// GetProviders обрабатывает GET /api/v1/auth/oauth/providers
-// Возвращает список доступных OAuth провайдеров
-func (h *Handler) GetProviders(w http.ResponseWriter, r *http.Request) {
-	if h.oauth == nil {
-		writeJSON(w, http.StatusOK, map[string]interface{}{
-			"providers": []interface{}{},
-		})
-		return
-	}
-
-	providers := h.oauth.GetProviders()
-
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"providers": providers,
-	})
-}
-
 // extractProvider извлекает имя провайдера из пути /api/v1/auth/oauth/{provider}
 func extractProvider(path string) string {
 	// Удаляем префикс
@@ -133,11 +117,6 @@ func extractProvider(path string) string {
 
 	// Проверяем, что это не callback
 	if strings.Contains(path, "/") {
-		return ""
-	}
-
-	// Проверяем, что это не providers
-	if path == "providers" {
 		return ""
 	}
 
@@ -169,7 +148,7 @@ func redirectWithTokens(w http.ResponseWriter, r *http.Request, frontendURL, acc
 		Name:     accessTokenCookieName,
 		Value:    accessToken,
 		Path:     "/",
-		HttpOnly: true, // HttpOnly для безопасности
+		HttpOnly: true,  // HttpOnly для безопасности
 		Secure:   false, // true для HTTPS в production
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   accessTokenMaxAge,
@@ -222,4 +201,3 @@ func writeError(w http.ResponseWriter, status int, message string) {
 		"error": message,
 	})
 }
-

@@ -52,7 +52,7 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 				w.Header().Set("X-Request-Id", requestID[0])
 			}
 		}
-		
+
 		// Извлекаем userId и requestId из error details
 		var extractedUserId, extractedRequestId string
 		if st, ok := status.FromError(err); ok {
@@ -85,7 +85,7 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 				}
 			}
 		}
-		
+
 		// Если есть userId и requestId, переформатируем ответ
 		if extractedUserId != "" && extractedRequestId != "" {
 			// Создаем буфер для перехвата стандартного ответа
@@ -97,13 +97,13 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 			}
 			writer := &bufferedErrorWriter{
 				ResponseWriter: w,
-				buf:           buf,
-				headers:       headersCopy,
+				buf:            buf,
+				headers:        headersCopy,
 			}
-			
+
 			// Вызываем стандартный обработчик ошибок в буфер
 			runtime.DefaultHTTPErrorHandler(ctx, mux, marshaler, writer, r, err)
-			
+
 			// Парсим JSON ответа
 			var errorResponse map[string]interface{}
 			if err := json.Unmarshal(buf.Bytes(), &errorResponse); err == nil {
@@ -112,28 +112,28 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 					"requestId": extractedRequestId,
 					"userId":    extractedUserId,
 				}
-				
+
 				// Устанавливаем заголовки
 				for key, values := range writer.headers {
 					for _, value := range values {
 						w.Header().Set(key, value)
 					}
 				}
-				
+
 				// Устанавливаем статус код
 				if writer.statusCode != 0 {
 					w.WriteHeader(writer.statusCode)
 				} else {
 					w.WriteHeader(http.StatusInternalServerError)
 				}
-				
+
 				// Записываем переформатированный JSON
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode(errorResponse)
 				return
 			}
 		}
-		
+
 		// Если не удалось переформатировать, используем стандартный обработчик
 		runtime.DefaultHTTPErrorHandler(ctx, mux, marshaler, w, r, err)
 	}
@@ -141,7 +141,7 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 	// Функция для добавления Origin/Host в gRPC metadata
 	metadataFunc := func(ctx context.Context, r *http.Request) metadata.MD {
 		md := metadata.MD{}
-		
+
 		// Извлекаем Origin или формируем из Host
 		origin := r.Header.Get("Origin")
 		if origin == "" {
@@ -155,11 +155,11 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 				origin = fmt.Sprintf("%s://%s", scheme, host)
 			}
 		}
-		
+
 		if origin != "" {
 			md.Set("x-frontend-origin", origin)
 		}
-		
+
 		return md
 	}
 
@@ -188,15 +188,6 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 
 	// Регистрируем OAuth роуты (если OAuth включен)
 	if oauthHandler != nil {
-		// GET /api/v1/auth/oauth/providers - список провайдеров
-		mainMux.HandleFunc("/api/v1/auth/oauth/providers", func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == http.MethodGet || r.Method == http.MethodOptions {
-				oauthHandler.GetProviders(w, r)
-			} else {
-				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			}
-		})
-
 		// GET /api/v1/auth/oauth/{provider}/callback - OAuth callback
 		mainMux.HandleFunc("/api/v1/auth/oauth/", func(w http.ResponseWriter, r *http.Request) {
 			path := r.URL.Path
