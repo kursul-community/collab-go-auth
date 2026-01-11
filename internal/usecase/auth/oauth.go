@@ -30,8 +30,15 @@ type OAuthUseCase interface {
 	GetAuthURL(provider string) (authURL, state string, err error)
 	// HandleCallback - обрабатывает callback от OAuth провайдера
 	HandleCallback(provider, code, state string) (accessToken, refreshToken string, err error)
-	// GetProviders - возвращает список доступных OAuth провайдеров
-	GetProviders() []oauth.ProviderInfo
+	// GetProviders - возвращает список доступных OAuth провайдеров с ссылками
+	GetProviders() ([]ProviderResponse, error)
+}
+
+// ProviderResponse - ответ для списка провайдеров
+type ProviderResponse struct {
+	DisplayName string `json:"displayName"`
+	AuthURL     string `json:"auth_url"`
+	State       string `json:"state"`
 }
 
 // oauthUseCase - реализация OAuthUseCase
@@ -228,8 +235,25 @@ func (uc *oauthUseCase) findOrCreateOAuthUser(ctx context.Context, userInfo *ent
 	return newUser, nil
 }
 
-// GetProviders - возвращает список доступных OAuth провайдеров
-func (uc *oauthUseCase) GetProviders() []oauth.ProviderInfo {
-	return uc.oauthManager.GetEnabledProviders()
+// GetProviders - возвращает список доступных OAuth провайдеров с ссылками и state
+func (uc *oauthUseCase) GetProviders() ([]ProviderResponse, error) {
+	enabledProviders := uc.oauthManager.GetEnabledProviders()
+	var response []ProviderResponse
+
+	for _, p := range enabledProviders {
+		authURL, state, err := uc.GetAuthURL(p.Name)
+		if err != nil {
+			log.Printf("OAuth: failed to get auth URL for provider %s: %v", p.Name, err)
+			continue
+		}
+
+		response = append(response, ProviderResponse{
+			DisplayName: p.Name,
+			AuthURL:     authURL,
+			State:       state,
+		})
+	}
+
+	return response, nil
 }
 

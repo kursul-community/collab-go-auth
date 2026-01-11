@@ -108,6 +108,28 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 	redirectWithTokens(w, r, h.frontendURL, accessToken, refreshToken)
 }
 
+// GetProviders обрабатывает GET /api/v1/auth/oauth/providers
+// Возвращает список доступных OAuth провайдеров с ссылками и state
+func (h *Handler) GetProviders(w http.ResponseWriter, r *http.Request) {
+	if h.oauth == nil {
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"providers": []interface{}{},
+		})
+		return
+	}
+
+	providers, err := h.oauth.GetProviders()
+	if err != nil {
+		log.Printf("OAuth: GetProviders error: %v", err)
+		writeError(w, http.StatusInternalServerError, "failed to get providers")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"providers": providers,
+	})
+}
+
 // extractProvider извлекает имя провайдера из пути /api/v1/auth/oauth/{provider}
 func extractProvider(path string) string {
 	// Удаляем префикс
@@ -117,6 +139,11 @@ func extractProvider(path string) string {
 
 	// Проверяем, что это не callback
 	if strings.Contains(path, "/") {
+		return ""
+	}
+
+	// Проверяем, что это не providers
+	if path == "providers" {
 		return ""
 	}
 
