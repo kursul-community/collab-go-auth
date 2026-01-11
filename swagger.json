@@ -574,12 +574,12 @@
     "/auth/oauth/providers": {
       "get": {
         "tags": ["OAuth2"],
-        "summary": "Список доступных OAuth2 провайдеров",
-        "description": "Возвращает список включённых OAuth2 провайдеров для отображения кнопок на фронтенде",
+        "summary": "Список доступных OAuth2 провайдеров с ссылками",
+        "description": "Возвращает список всех включённых OAuth2 провайдеров, включая готовые ссылки для авторизации и state.",
         "operationId": "oauthListProviders",
         "responses": {
           "200": {
-            "description": "Список провайдеров",
+            "description": "Список провайдеров с ссылками",
             "content": {
               "application/json": {
                 "schema": {
@@ -809,8 +809,13 @@
       },
       "OAuthAuthUrlResponse": {
         "type": "object",
-        "required": ["auth_url", "state"],
+        "required": ["displayName", "auth_url", "state"],
         "properties": {
+          "displayName": {
+            "type": "string",
+            "description": "Имя провайдера для отображения",
+            "example": "google"
+          },
           "auth_url": {
             "type": "string",
             "format": "uri",
@@ -831,38 +836,11 @@
           "providers": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/OAuthProviderInfo"
-            },
-            "description": "Список доступных провайдеров"
+              "$ref": "#/components/schemas/OAuthAuthUrlResponse"
+            }
           }
         }
       },
-      "OAuthProviderInfo": {
-        "type": "object",
-        "required": ["name", "enabled"],
-        "properties": {
-          "name": {
-            "$ref": "#/components/schemas/OAuthProvider"
-          },
-          "display_name": {
-            "type": "string",
-            "description": "Отображаемое имя провайдера",
-            "example": "Google"
-          },
-          "enabled": {
-            "type": "boolean",
-            "description": "Включён ли провайдер",
-            "example": true
-          },
-          "icon_url": {
-            "type": "string",
-            "format": "uri",
-            "description": "URL иконки провайдера",
-            "example": "https://example.com/icons/google.svg"
-          }
-        }
-      }
-    },
     "securitySchemes": {
       "BearerAuth": {
         "type": "http",

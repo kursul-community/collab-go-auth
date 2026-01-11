@@ -188,6 +188,15 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 
 	// Регистрируем OAuth роуты (если OAuth включен)
 	if oauthHandler != nil {
+		// GET /api/v1/auth/oauth/providers - список провайдеров
+		mainMux.HandleFunc("/api/v1/auth/oauth/providers", func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodGet || r.Method == http.MethodOptions {
+				oauthHandler.GetProviders(w, r)
+			} else {
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			}
+		})
+
 		// GET /api/v1/auth/oauth/{provider}/callback - OAuth callback
 		mainMux.HandleFunc("/api/v1/auth/oauth/", func(w http.ResponseWriter, r *http.Request) {
 			path := r.URL.Path
