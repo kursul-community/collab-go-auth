@@ -44,6 +44,29 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 		// Извлекаем metadata из ServerMetadata
 		md, ok := runtime.ServerMetadataFromContext(ctx)
 		if ok {
+			// Проверяем наличие x-http-code в заголовках
+			httpCodeHeader := md.HeaderMD.Get("x-http-code")
+			if len(httpCodeHeader) == 0 {
+				httpCodeHeader = md.HeaderMD.Get("Grpc-Metadata-X-Http-Code")
+			}
+
+			if len(httpCodeHeader) > 0 {
+				var code int
+				if n, _ := fmt.Sscanf(httpCodeHeader[0], "%d", &code); n > 0 && code != 0 {
+					// Устанавливаем статус код и пишем ответ вручную
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(code)
+
+					st, _ := status.FromError(err)
+					errorResponse := map[string]interface{}{
+						"code":    st.Code(),
+						"message": st.Message(),
+					}
+					json.NewEncoder(w).Encode(errorResponse)
+					return
+				}
+			}
+
 			// Проверяем наличие user-id и request-id в заголовках
 			if userID := md.HeaderMD.Get("user-id"); len(userID) > 0 {
 				w.Header().Set("X-User-Id", userID[0])
@@ -167,6 +190,13 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 	grpcMux := runtime.NewServeMux(
 		runtime.WithErrorHandler(customErrorHandler),
 		runtime.WithMetadata(metadataFunc),
+		runtime.WithOutgoingHeaderMatcher(func(key string) (string, bool) {
+			// Пробрасываем x-http-code напрямую без префикса Grpc-Metadata-
+			if strings.ToLower(key) == "x-http-code" {
+				return "x-http-code", true
+			}
+			return runtime.DefaultHeaderMatcher(key)
+		}),
 	)
 
 	// Настройки для подключения к gRPC серверу
@@ -292,7 +322,13 @@ func cookieMiddleware(next http.Handler) http.Handler {
 		// Если статус успешный, парсим ответ и устанавливаем cookies
 		if bw.statusCode == http.StatusOK || bw.statusCode == 0 {
 			// Проверяем наличие x-http-code в заголовках
-			if httpCode := bw.headers.Get("x-http-code"); httpCode != "" {
+			// Проверяем как прямой заголовок, так и с префиксом Grpc-Metadata-
+			httpCode := bw.headers.Get("x-http-code")
+			if httpCode == "" {
+				httpCode = bw.headers.Get("Grpc-Metadata-X-Http-Code")
+			}
+
+			if httpCode != "" {
 				var code int
 				if n, _ := fmt.Sscanf(httpCode, "%d", &code); n > 0 && code != 0 {
 					bw.statusCode = code
