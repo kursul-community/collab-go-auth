@@ -902,9 +902,9 @@
       "name": "Password Recovery",
       "description": "Восстановление пароля"
     },
-    "OAuth2": {
-      "description": "Авторизация через внешних провайдеров (Google, GitHub, Yandex, VK)",
-      "name": "OAuth2"
+    {
+      "name": "OAuth2",
+      "description": "Авторизация через внешних провайдеров (Google, GitHub, Yandex, VK)"
     }
   ]
 }

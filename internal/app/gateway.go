@@ -293,7 +293,8 @@ func cookieMiddleware(next http.Handler) http.Handler {
 		if bw.statusCode == http.StatusOK || bw.statusCode == 0 {
 			// Проверяем наличие x-http-code в заголовках
 			if httpCode := bw.headers.Get("x-http-code"); httpCode != "" {
-				if code := 0; fmt.Sscanf(httpCode, "%d", &code); code != 0 {
+				var code int
+				if n, _ := fmt.Sscanf(httpCode, "%d", &code); n > 0 && code != 0 {
 					bw.statusCode = code
 				}
 			}
