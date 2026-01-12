@@ -117,6 +117,16 @@
                 }
               }
             }
+          },
+          "209": {
+            "description": "Аутентификация успешна, но профиль пользователя не заполнен. Возвращает токены.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -840,7 +850,8 @@
             }
           }
         }
-      },
+      }
+    },
     "securitySchemes": {
       "BearerAuth": {
         "type": "http",
@@ -891,9 +902,9 @@
       "name": "Password Recovery",
       "description": "Восстановление пароля"
     },
-    {
-      "name": "OAuth2",
-      "description": "Авторизация через внешних провайдеров (Google, GitHub, Yandex, VK)"
+    "OAuth2": {
+      "description": "Авторизация через внешних провайдеров (Google, GitHub, Yandex, VK)",
+      "name": "OAuth2"
     }
   ]
 }

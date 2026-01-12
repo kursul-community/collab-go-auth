@@ -76,6 +76,17 @@ func (s *AuthServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Login
 		// Проверяем, является ли ошибка LoginError с userID и requestID
 		var loginErr *usecase.LoginError
 		if errors.As(err, &loginErr) {
+			if errors.Is(loginErr.Err, usecase.ErrProfileNotFilled) {
+				// Если профиль не заполнен, устанавливаем x-http-code в 209
+				// и возвращаем токены (успех в gRPC, но 209 в HTTP)
+				md := metadata.Pairs("x-http-code", "209")
+				grpc.SetHeader(ctx, md)
+				return &pb.LoginResponse{
+					AccessToken:  accessToken,
+					RefreshToken: refreshToken,
+				}, nil
+			}
+
 			// Добавляем userID и requestID в metadata ответа
 			md := metadata.New(map[string]string{
 				"user-id":    loginErr.UserID,

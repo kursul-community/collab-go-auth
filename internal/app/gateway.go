@@ -291,6 +291,13 @@ func cookieMiddleware(next http.Handler) http.Handler {
 
 		// Если статус успешный, парсим ответ и устанавливаем cookies
 		if bw.statusCode == http.StatusOK || bw.statusCode == 0 {
+			// Проверяем наличие x-http-code в заголовках
+			if httpCode := bw.headers.Get("x-http-code"); httpCode != "" {
+				if code := 0; fmt.Sscanf(httpCode, "%d", &code); code != 0 {
+					bw.statusCode = code
+				}
+			}
+
 			var response map[string]interface{}
 			if err := json.Unmarshal(bw.buf.Bytes(), &response); err == nil {
 				// gRPC-Gateway возвращает camelCase: accessToken, refreshToken

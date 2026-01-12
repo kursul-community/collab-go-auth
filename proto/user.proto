@@ -1,0 +1,86 @@
+syntax = "proto3";
+
+package user;
+
+import "google/api/annotations.proto";
+
+option go_package = "collab-user-service/gen/user";
+
+service UserService {
+  // Обновить или создать профиль текущего пользователя
+  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/user/profile"
+      body: "*"
+    };
+  }
+
+  // Получить профиль текущего пользователя (по токену)
+  rpc GetMyProfile(GetMyProfileRequest) returns (GetMyProfileResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/user/me"
+    };
+  }
+
+  // Получить профиль любого пользователя по ID
+  rpc GetProfile(GetProfileRequest) returns (GetProfileResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/user/profile/{user_id}"
+    };
+  }
+
+  // Получить список доступных позиций
+  rpc GetPositions(GetPositionsRequest) returns (GetPositionsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/user/positions"
+    };
+  }
+}
+
+message Position {
+  string id = 1;
+  string name = 2;
+  string category = 3;
+}
+
+message UserProfile {
+  string user_id = 1;
+  string username = 2;
+  string about_info = 3;
+  string git_url = 4;
+  string position = 5;
+  string created_at = 6;
+  string updated_at = 7;
+}
+
+message UpdateProfileRequest {
+  string user_id = 1; // Будет браться из токена, если не передан
+  string username = 2;
+  string about_info = 3;
+  string git_url = 4;
+  string position = 5;
+}
+
+message UpdateProfileResponse {
+  string status = 1;
+}
+
+message GetMyProfileRequest {}
+
+message GetMyProfileResponse {
+  UserProfile profile = 1;
+}
+
+message GetProfileRequest {
+  string user_id = 1;
+}
+
+message GetProfileResponse {
+  UserProfile profile = 1;
+}
+
+message GetPositionsRequest {}
+
+message GetPositionsResponse {
+  repeated string positions = 1;
+}

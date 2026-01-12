@@ -17,6 +17,7 @@ import (
 	oauthadapter "go-auth/internal/adapter/oauth"
 	redisadapter "go-auth/internal/adapter/redis"
 	"go-auth/internal/adapter/token"
+	userclient "go-auth/internal/adapter/user"
 	grpcauth "go-auth/internal/controller/grpc/auth"
 	oauthhttp "go-auth/internal/controller/http/oauth"
 	tokenrepo "go-auth/internal/repo/token"
@@ -64,9 +65,17 @@ func Run(cfg *config.Config, devMode bool) {
 	}
 	logger.Printf("Email service initialized (SMTP: %s)", cfg.SMTP.Addr())
 
+	// Инициализация клиента user-service
+	userSvcClient, err := userclient.NewClient(cfg.Services.UserService)
+	if err != nil {
+		logger.Fatalf("Failed to initialize user service client: %v", err)
+	}
+	logger.Printf("User service client initialized (addr: %s)", cfg.Services.UserService)
+
 	// Создаем слой usecase с TTL параметрами
 	authUseCase := usecase.NewAuthUseCase(
 		userRepo,
+		userSvcClient,
 		tokenRepo,
 		tokenSvc,
 		mailer,
