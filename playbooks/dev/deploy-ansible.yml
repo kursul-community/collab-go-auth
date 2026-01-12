@@ -57,9 +57,9 @@
     - name: Login to GitHub Container Registry
       community.docker.docker_login:
         registry_url: "{{ registry }}"
-        username: "{{ lookup('env', 'GHCR_USERNAME') | default('github', true) }}"
-        password: "{{ lookup('env', 'GHCR_TOKEN') }}"
-      when: registry == 'ghcr.io' and lookup('env', 'GHCR_TOKEN') is defined
+        username: "{{ ghcr_username | default(lookup('env', 'GHCR_USERNAME')) | default('github', true) }}"
+        password: "{{ ghcr_token | default(lookup('env', 'GHCR_TOKEN')) }}"
+      when: registry == 'ghcr.io' and (ghcr_token is defined or lookup('env', 'GHCR_TOKEN') != "")
 
     - name: Down Auth
       community.docker.docker_compose_v2:
