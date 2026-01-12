@@ -44,8 +44,11 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 		// Извлекаем metadata из ServerMetadata
 		md, ok := runtime.ServerMetadataFromContext(ctx)
 		if ok {
-			// Проверяем наличие x-http-code в заголовках
+			// Проверяем наличие x-http-code в заголовках (разные варианты написания)
 			httpCodeHeader := md.HeaderMD.Get("x-http-code")
+			if len(httpCodeHeader) == 0 {
+				httpCodeHeader = md.HeaderMD.Get("X-Http-Code")
+			}
 			if len(httpCodeHeader) == 0 {
 				httpCodeHeader = md.HeaderMD.Get("Grpc-Metadata-X-Http-Code")
 			}
@@ -74,6 +77,8 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 			if requestID := md.HeaderMD.Get("request-id"); len(requestID) > 0 {
 				w.Header().Set("X-Request-Id", requestID[0])
 			}
+		} else {
+			log.Printf("Gateway customErrorHandler: failed to extract ServerMetadata from context for error: %v", err)
 		}
 
 		// Извлекаем userId и requestId из error details
@@ -322,8 +327,11 @@ func cookieMiddleware(next http.Handler) http.Handler {
 		// Если статус успешный, парсим ответ и устанавливаем cookies
 		if bw.statusCode == http.StatusOK || bw.statusCode == 0 {
 			// Проверяем наличие x-http-code в заголовках
-			// Проверяем как прямой заголовок, так и с префиксом Grpc-Metadata-
+			// Проверяем все возможные варианты написания (из-за возможной нормализации прокси-серверами)
 			httpCode := bw.headers.Get("x-http-code")
+			if httpCode == "" {
+				httpCode = bw.headers.Get("X-Http-Code")
+			}
 			if httpCode == "" {
 				httpCode = bw.headers.Get("Grpc-Metadata-X-Http-Code")
 			}
@@ -332,6 +340,7 @@ func cookieMiddleware(next http.Handler) http.Handler {
 				var code int
 				if n, _ := fmt.Sscanf(httpCode, "%d", &code); n > 0 && code != 0 {
 					bw.statusCode = code
+					log.Printf("Gateway cookieMiddleware: override status code to %d from x-http-code header", code)
 				}
 			}
 
