@@ -121,4 +121,4 @@
         OAUTH_GITHUB_CLIENT_ID: "{{ lookup('env', 'OAUTH_GITHUB_CLIENT_ID') }}"
         OAUTH_GITHUB_CLIENT_SECRET: "{{ lookup('env', 'OAUTH_GITHUB_CLIENT_SECRET') }}"
         OAUTH_FRONTEND_CALLBACK_URL: "{{ lookup('env', 'OAUTH_FRONTEND_CALLBACK_URL') }}"
-        OAUTH_BACKEND_BASE_URL: "{{ lookup('env', 'OAUTH_BACKEND_BASE_URL') }}"
+        OAUTH_BACKEND_BASE_URL: "{{ lookup('env', 'OAUTH_BACKEND_BASE_URL') }}" 
