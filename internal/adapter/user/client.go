@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	pb "go-auth/gen/user"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -53,4 +54,3 @@ func (c *client) ProfileExists(ctx context.Context, userID string) (bool, error)
 
 	return true, nil
 }
-
