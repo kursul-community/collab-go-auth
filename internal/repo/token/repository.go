@@ -72,9 +72,9 @@ type Repository interface {
 	DeletePasswordResetRequest(ctx context.Context, userID string) error
 
 	// === OAuth ===
-	// StoreOAuthState - сохранение OAuth state для CSRF защиты
-	StoreOAuthState(ctx context.Context, state string, provider string, ttl time.Duration) error
-	// GetOAuthState - получение провайдера по OAuth state
+	// StoreOAuthState - сохранение OAuth state (теперь сохраняет произвольную строку данных)
+	StoreOAuthState(ctx context.Context, state string, data string, ttl time.Duration) error
+	// GetOAuthState - получение данных по OAuth state
 	GetOAuthState(ctx context.Context, state string) (string, error)
 	// DeleteOAuthState - удаление OAuth state
 	DeleteOAuthState(ctx context.Context, state string) error
@@ -350,17 +350,17 @@ func (r *repository) DeletePasswordResetRequest(ctx context.Context, userID stri
 // ==================== OAuth ====================
 
 // StoreOAuthState - сохранение OAuth state для CSRF защиты
-func (r *repository) StoreOAuthState(ctx context.Context, state string, provider string, ttl time.Duration) error {
+func (r *repository) StoreOAuthState(ctx context.Context, state string, data string, ttl time.Duration) error {
 	key := oauthStatePrefix + state
-	err := r.client.Set(ctx, key, provider, ttl).Err()
+	err := r.client.Set(ctx, key, data, ttl).Err()
 	if err != nil {
 		return fmt.Errorf("failed to store oauth state: %w", err)
 	}
 
 	// Проверяем, что действительно сохранилось
 	stored, _ := r.client.Get(ctx, key).Result()
-	if stored != provider {
-		return fmt.Errorf("failed to verify oauth state storage: expected %s, got %s", provider, stored)
+	if stored != data {
+		return fmt.Errorf("failed to verify oauth state storage: expected %s, got %s", data, stored)
 	}
 
 	return nil

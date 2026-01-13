@@ -56,6 +56,8 @@ services:
       OAUTH_GOOGLE_CLIENT_SECRET: ${OAUTH_GOOGLE_CLIENT_SECRET}
       OAUTH_GITHUB_CLIENT_ID: ${OAUTH_GITHUB_CLIENT_ID}
       OAUTH_GITHUB_CLIENT_SECRET: ${OAUTH_GITHUB_CLIENT_SECRET}
+      OAUTH_FRONTEND_CALLBACK_URL: http://localhost:5173/auth/callback
+      OAUTH_BACKEND_BASE_URL: http://localhost:8081
     depends_on:
       postgres:
         condition: service_healthy

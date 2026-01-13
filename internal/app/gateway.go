@@ -342,8 +342,8 @@ func cookieMiddleware(next http.Handler) http.Handler {
 		// Выполняем следующий handler
 		next.ServeHTTP(bw, r)
 
-		// Если статус успешный, парсим ответ и устанавливаем cookies
-		if bw.statusCode == http.StatusOK || bw.statusCode == 0 {
+		// Если статус успешный или 209 (профиль не заполнен), парсим ответ и устанавливаем cookies
+		if bw.statusCode == http.StatusOK || bw.statusCode == 0 || bw.statusCode == 209 {
 			// Проверяем наличие x-http-code в заголовках
 			// Проверяем все возможные варианты написания (из-за возможной нормализации прокси-серверами)
 			httpCode := bw.headers.Get("x-http-code")

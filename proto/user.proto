@@ -8,9 +8,9 @@ option go_package = "collab-user-service/gen/user";
 
 service UserService {
   // Обновить или создать профиль текущего пользователя
-  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse) {
+  rpc CreateProfile(UpdateProfileRequest) returns (UpdateProfileResponse) {
     option (google.api.http) = {
-      post: "/api/v1/user/profile"
+      post: "/api/v1/user/create-profile"
       body: "*"
     };
   }

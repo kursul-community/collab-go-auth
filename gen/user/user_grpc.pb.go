@@ -19,7 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	UserService_UpdateProfile_FullMethodName = "/user.UserService/UpdateProfile"
+	UserService_CreateProfile_FullMethodName = "/user.UserService/CreateProfile"
 	UserService_GetMyProfile_FullMethodName  = "/user.UserService/GetMyProfile"
 	UserService_GetProfile_FullMethodName    = "/user.UserService/GetProfile"
 	UserService_GetPositions_FullMethodName  = "/user.UserService/GetPositions"
@@ -30,7 +30,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type UserServiceClient interface {
 	// Обновить или создать профиль текущего пользователя
-	UpdateProfile(ctx context.Context, in *UpdateProfileRequest, opts ...grpc.CallOption) (*UpdateProfileResponse, error)
+	CreateProfile(ctx context.Context, in *UpdateProfileRequest, opts ...grpc.CallOption) (*UpdateProfileResponse, error)
 	// Получить профиль текущего пользователя (по токену)
 	GetMyProfile(ctx context.Context, in *GetMyProfileRequest, opts ...grpc.CallOption) (*GetMyProfileResponse, error)
 	// Получить профиль любого пользователя по ID
@@ -47,10 +47,10 @@ func NewUserServiceClient(cc grpc.ClientConnInterface) UserServiceClient {
 	return &userServiceClient{cc}
 }
 
-func (c *userServiceClient) UpdateProfile(ctx context.Context, in *UpdateProfileRequest, opts ...grpc.CallOption) (*UpdateProfileResponse, error) {
+func (c *userServiceClient) CreateProfile(ctx context.Context, in *UpdateProfileRequest, opts ...grpc.CallOption) (*UpdateProfileResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdateProfileResponse)
-	err := c.cc.Invoke(ctx, UserService_UpdateProfile_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, UserService_CreateProfile_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func (c *userServiceClient) GetPositions(ctx context.Context, in *GetPositionsRe
 // for forward compatibility.
 type UserServiceServer interface {
 	// Обновить или создать профиль текущего пользователя
-	UpdateProfile(context.Context, *UpdateProfileRequest) (*UpdateProfileResponse, error)
+	CreateProfile(context.Context, *UpdateProfileRequest) (*UpdateProfileResponse, error)
 	// Получить профиль текущего пользователя (по токену)
 	GetMyProfile(context.Context, *GetMyProfileRequest) (*GetMyProfileResponse, error)
 	// Получить профиль любого пользователя по ID
@@ -109,8 +109,8 @@ type UserServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedUserServiceServer struct{}
 
-func (UnimplementedUserServiceServer) UpdateProfile(context.Context, *UpdateProfileRequest) (*UpdateProfileResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method UpdateProfile not implemented")
+func (UnimplementedUserServiceServer) CreateProfile(context.Context, *UpdateProfileRequest) (*UpdateProfileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateProfile not implemented")
 }
 func (UnimplementedUserServiceServer) GetMyProfile(context.Context, *GetMyProfileRequest) (*GetMyProfileResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMyProfile not implemented")
@@ -142,20 +142,20 @@ func RegisterUserServiceServer(s grpc.ServiceRegistrar, srv UserServiceServer) {
 	s.RegisterService(&UserService_ServiceDesc, srv)
 }
 
-func _UserService_UpdateProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _UserService_CreateProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdateProfileRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(UserServiceServer).UpdateProfile(ctx, in)
+		return srv.(UserServiceServer).CreateProfile(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: UserService_UpdateProfile_FullMethodName,
+		FullMethod: UserService_CreateProfile_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(UserServiceServer).UpdateProfile(ctx, req.(*UpdateProfileRequest))
+		return srv.(UserServiceServer).CreateProfile(ctx, req.(*UpdateProfileRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -222,8 +222,8 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*UserServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "UpdateProfile",
-			Handler:    _UserService_UpdateProfile_Handler,
+			MethodName: "CreateProfile",
+			Handler:    _UserService_CreateProfile_Handler,
 		},
 		{
 			MethodName: "GetMyProfile",
