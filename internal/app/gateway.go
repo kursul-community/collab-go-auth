@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"go-auth/config"
@@ -191,10 +192,27 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 		return md
 	}
 
+	// Функция для обработки успешных ответов и установки кастомных HTTP кодов
+	forwardResponseOption := func(ctx context.Context, w http.ResponseWriter, resp proto.Message) error {
+		md, ok := runtime.ServerMetadataFromContext(ctx)
+		if !ok {
+			return nil
+		}
+
+		if codes := md.HeaderMD.Get("x-http-code"); len(codes) > 0 {
+			var code int
+			if n, _ := fmt.Sscanf(codes[0], "%d", &code); n > 0 && code != 0 {
+				w.WriteHeader(code)
+			}
+		}
+		return nil
+	}
+
 	// Создаем gRPC Gateway mux с кастомным error handler и metadata функцией
 	grpcMux := runtime.NewServeMux(
 		runtime.WithErrorHandler(customErrorHandler),
 		runtime.WithMetadata(metadataFunc),
+		runtime.WithForwardResponseOption(forwardResponseOption),
 		runtime.WithOutgoingHeaderMatcher(func(key string) (string, bool) {
 			// Пробрасываем x-http-code напрямую без префикса Grpc-Metadata-
 			if strings.ToLower(key) == "x-http-code" {

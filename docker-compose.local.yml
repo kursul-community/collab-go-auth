@@ -15,6 +15,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - collab-network
 
   redis:
     image: redis:7-alpine
@@ -29,6 +31,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - collab-network
 
   app:
     build:
@@ -62,17 +66,20 @@ services:
       - ./config:/app/config
     ports:
       - "60051:60051"  # gRPC
-      - "8085:8080"    # HTTP REST Gateway (Internal 8080 from config.yaml)
+      - "8081:8080"    # HTTP REST Gateway (Internal 8080 from config.yaml)
     command: >
       sh -c "
         /app/migrate up &&
         /app/go-auth
       "
-#    healthcheck:
-#      test: ["CMD-SHELL", "curl -f http://localhost:60051/health || exit 1"]
-#      interval: 10s
-#      timeout: 5s
-#      retries: 5
+    networks:
+      - collab-network
+
+networks:
+  collab-network:
+    name: collab-network
+    driver: bridge
+    external: true
 
 volumes:
   postgres_data:

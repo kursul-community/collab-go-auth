@@ -31,7 +31,7 @@ func NewClient(addr string) (Client, error) {
 }
 
 func (c *client) ProfileExists(ctx context.Context, userID string) (bool, error) {
-	_, err := c.userClient.GetProfile(ctx, &pb.GetProfileRequest{UserId: userID})
+	resp, err := c.userClient.GetProfile(ctx, &pb.GetProfileRequest{UserId: userID})
 	if err != nil {
 		st, ok := status.FromError(err)
 		if ok && st.Code() == codes.NotFound {
@@ -39,6 +39,18 @@ func (c *client) ProfileExists(ctx context.Context, userID string) (bool, error)
 		}
 		return false, err
 	}
+
+	profile := resp.GetProfile()
+	if profile == nil {
+		return false, nil
+	}
+
+	// Проверяем, заполнено ли хотя бы одно поле.
+	// Если все поля пустые, считаем, что профиль не заполнен (209).
+	if profile.Username == "" && profile.AboutInfo == "" && profile.GitUrl == "" && profile.Position == "" {
+		return false, nil
+	}
+
 	return true, nil
 }
 

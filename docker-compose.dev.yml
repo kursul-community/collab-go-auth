@@ -58,6 +58,8 @@ services:
     volumes:
       - ./migrations:/app/migrations
       - ./config:/app/config
+    networks:
+      - collab-network
     ports:
       - "60051:60051"  # gRPC
       - "8081:8080"    # HTTP REST Gateway (Внешний 8081 -> Внутренний 8080)
@@ -66,6 +68,11 @@ services:
         /app/migrate up &&
         /app/go-auth
       "
+networks:
+  collab-network:
+    name: collab-network
+    driver: bridge
+    external: true
 
 volumes:
   postgres_data:

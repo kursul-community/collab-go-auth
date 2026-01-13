@@ -72,7 +72,7 @@ func (s *AuthServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Login
 		if errors.Is(err, usecase.ErrInvalidCredentials) {
 			return nil, status.Error(codes.Unauthenticated, "Invalid Credentials")
 		}
-		
+
 		// Проверяем, является ли ошибка LoginError с userID и requestID
 		var loginErr *usecase.LoginError
 		if errors.As(err, &loginErr) {
@@ -95,7 +95,7 @@ func (s *AuthServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Login
 			// Устанавливаем metadata через SetHeader для gRPC
 			// Это должно работать для передачи через gateway
 			grpc.SetHeader(ctx, md)
-			
+
 			if errors.Is(loginErr.Err, usecase.ErrUserNotActive) {
 				// Создаем статус с Struct в details (только requestId и userId)
 				st := status.New(codes.PermissionDenied, "User account is not active")
@@ -117,7 +117,7 @@ func (s *AuthServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Login
 				} else {
 					log.Printf("Verification code resent for user %s (requestID: %s)", loginErr.UserID, loginErr.RequestID)
 				}
-				
+
 				// Создаем статус с Struct в details (только requestId и userId)
 				st := status.New(codes.PermissionDenied, "Email not verified")
 				detailsStruct, err := structpb.NewStruct(map[string]interface{}{
@@ -130,7 +130,7 @@ func (s *AuthServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Login
 				return nil, st.Err()
 			}
 		}
-		
+
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	return &pb.LoginResponse{
