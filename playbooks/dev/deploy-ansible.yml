@@ -61,6 +61,11 @@
         password: "{{ ghcr_token | default(lookup('env', 'GHCR_TOKEN')) }}"
       when: registry == 'ghcr.io' and (ghcr_token is defined or lookup('env', 'GHCR_TOKEN') != "")
 
+    - name: Ensure collab-network exists
+      community.docker.docker_network:
+        name: collab-network
+        state: present
+
     - name: Down Auth
       community.docker.docker_compose_v2:
         project_src: "{{ deploy_path }}"
