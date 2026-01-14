@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -27,11 +28,17 @@ var (
 // OAuthUseCase - интерфейс для OAuth аутентификации
 type OAuthUseCase interface {
 	// GetAuthURL - получает URL для OAuth авторизации
-	GetAuthURL(provider string) (authURL, state string, err error)
+	GetAuthURL(provider, frontendURL string) (authURL, state string, err error)
 	// HandleCallback - обрабатывает callback от OAuth провайдера
-	HandleCallback(provider, code, state string) (accessToken, refreshToken string, err error)
+	HandleCallback(provider, code, state string) (accessToken, refreshToken, redirectURL string, err error)
 	// GetProviders - возвращает список доступных OAuth провайдеров с ссылками
-	GetProviders() ([]ProviderResponse, error)
+	GetProviders(frontendURL string) ([]ProviderResponse, error)
+}
+
+// OAuthStateData - данные, сохраняемые в Redis для OAuth state
+type OAuthStateData struct {
+	Provider    string `json:"provider"`
+	FrontendURL string `json:"frontend_url"`
 }
 
 // ProviderResponse - ответ для списка провайдеров
@@ -62,7 +69,7 @@ func NewOAuthUseCase(baseAuth *auth, oauthManager *oauth.Manager, stateTTL time.
 }
 
 // GetAuthURL - генерирует URL для OAuth авторизации
-func (uc *oauthUseCase) GetAuthURL(providerName string) (string, string, error) {
+func (uc *oauthUseCase) GetAuthURL(providerName, frontendURL string) (string, string, error) {
 	ctx := context.Background()
 
 	// Получаем провайдера
@@ -79,9 +86,16 @@ func (uc *oauthUseCase) GetAuthURL(providerName string) (string, string, error) 
 		return "", "", err
 	}
 
+	// Подготавливаем данные для сохранения
+	stateData := OAuthStateData{
+		Provider:    providerName,
+		FrontendURL: frontendURL,
+	}
+	jsonData, _ := json.Marshal(stateData)
+
 	// Сохраняем state в Redis
 	log.Printf("OAuth: storing state '%s' for provider '%s' with TTL %v", state, providerName, uc.stateTTL)
-	err = uc.tokenRepo.StoreOAuthState(ctx, state, providerName, uc.stateTTL)
+	err = uc.tokenRepo.StoreOAuthState(ctx, state, string(jsonData), uc.stateTTL)
 	if err != nil {
 		log.Printf("OAuth: failed to store state in Redis: %v", err)
 		return "", "", err
@@ -99,24 +113,33 @@ func (uc *oauthUseCase) GetAuthURL(providerName string) (string, string, error) 
 }
 
 // HandleCallback - обрабатывает callback от OAuth провайдера
-func (uc *oauthUseCase) HandleCallback(providerName, code, state string) (string, string, error) {
+func (uc *oauthUseCase) HandleCallback(providerName, code, state string) (string, string, string, error) {
 	ctx := context.Background()
 
 	log.Printf("OAuth: handling callback for provider %s", providerName)
 
 	// Проверяем state
 	log.Printf("OAuth: checking state: %s", state)
-	storedProvider, err := uc.tokenRepo.GetOAuthState(ctx, state)
+	storedData, err := uc.tokenRepo.GetOAuthState(ctx, state)
 	if err != nil {
 		log.Printf("OAuth: failed to get state from Redis: %v", err)
-		return "", "", ErrOAuthInvalidState
+		return "", "", "", ErrOAuthInvalidState
 	}
 
-	log.Printf("OAuth: stored provider for state: '%s'", storedProvider)
+	if storedData == "" {
+		log.Printf("OAuth: empty state data for state: %s", state)
+		return "", "", "", ErrOAuthInvalidState
+	}
 
-	if storedProvider == "" || storedProvider != providerName {
-		log.Printf("OAuth: invalid state for provider %s (expected '%s', got '%s')", providerName, providerName, storedProvider)
-		return "", "", ErrOAuthInvalidState
+	var stateData OAuthStateData
+	if err := json.Unmarshal([]byte(storedData), &stateData); err != nil {
+		log.Printf("OAuth: failed to unmarshal state data: %v", err)
+		return "", "", "", ErrOAuthInvalidState
+	}
+
+	if stateData.Provider != providerName {
+		log.Printf("OAuth: invalid provider in state (expected '%s', got '%s')", providerName, stateData.Provider)
+		return "", "", "", ErrOAuthInvalidState
 	}
 
 	// Удаляем использованный state
@@ -125,7 +148,7 @@ func (uc *oauthUseCase) HandleCallback(providerName, code, state string) (string
 	// Получаем провайдера
 	provider, err := uc.oauthManager.GetProvider(providerName)
 	if err != nil {
-		return "", "", ErrOAuthProviderNotFound
+		return "", "", "", ErrOAuthProviderNotFound
 	}
 
 	// Обмениваем code на access token провайдера
@@ -135,7 +158,7 @@ func (uc *oauthUseCase) HandleCallback(providerName, code, state string) (string
 	tokenResp, err := provider.ExchangeCode(ctx, code, callbackURL)
 	if err != nil {
 		log.Printf("OAuth: failed to exchange code: %v", err)
-		return "", "", fmt.Errorf("%w: %v", ErrOAuthExchangeFailed, err)
+		return "", "", "", fmt.Errorf("%w: %v", ErrOAuthExchangeFailed, err)
 	}
 
 	log.Printf("OAuth: successfully exchanged code for token")
@@ -146,45 +169,43 @@ func (uc *oauthUseCase) HandleCallback(providerName, code, state string) (string
 	if err != nil {
 		log.Printf("OAuth: failed to get user info: %v", err)
 		log.Printf("OAuth: error details: %+v", err)
-		return "", "", fmt.Errorf("%w: %v", ErrOAuthUserInfoFailed, err)
+		return "", "", "", fmt.Errorf("%w: %v", ErrOAuthUserInfoFailed, err)
 	}
 
 	log.Printf("OAuth: successfully got user info - email: %s, id: %s", userInfo.Email, userInfo.ID)
-
-	log.Printf("OAuth: got user info - email: %s, provider_id: %s", userInfo.Email, userInfo.ID)
 
 	// Ищем или создаем пользователя
 	user, err := uc.findOrCreateOAuthUser(ctx, userInfo)
 	if err != nil {
 		log.Printf("OAuth: failed to find/create user: %v", err)
-		return "", "", err
+		return "", "", "", err
 	}
 
 	// Генерируем JWT токены
 	accessToken, err := uc.tokenService.GenerateAccessToken(user)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
 	refreshToken, err := uc.tokenService.GenerateRefreshToken(user)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
 	// Сохраняем токены в Redis
 	err = uc.tokenRepo.StoreAccessToken(ctx, user.ID, accessToken, uc.accessTTL)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
 	err = uc.tokenRepo.StoreRefreshToken(ctx, user.ID, refreshToken, uc.refreshTTL)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
 	log.Printf("OAuth: successfully authenticated user %s via %s", user.ID, providerName)
 
-	return accessToken, refreshToken, nil
+	return accessToken, refreshToken, stateData.FrontendURL, nil
 }
 
 // findOrCreateOAuthUser - ищет существующего пользователя или создает нового
@@ -236,12 +257,12 @@ func (uc *oauthUseCase) findOrCreateOAuthUser(ctx context.Context, userInfo *ent
 }
 
 // GetProviders - возвращает список доступных OAuth провайдеров с ссылками и state
-func (uc *oauthUseCase) GetProviders() ([]ProviderResponse, error) {
+func (uc *oauthUseCase) GetProviders(frontendURL string) ([]ProviderResponse, error) {
 	enabledProviders := uc.oauthManager.GetEnabledProviders()
 	var response []ProviderResponse
 
 	for _, p := range enabledProviders {
-		authURL, state, err := uc.GetAuthURL(p.Name)
+		authURL, state, err := uc.GetAuthURL(p.Name, frontendURL)
 		if err != nil {
 			log.Printf("OAuth: failed to get auth URL for provider %s: %v", p.Name, err)
 			continue

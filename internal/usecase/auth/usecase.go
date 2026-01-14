@@ -14,9 +14,10 @@ import (
 
 	"go-auth/internal/adapter/email"
 	"go-auth/internal/adapter/token"
+	"go-auth/internal/adapter/user"
 	"go-auth/internal/entity"
 	tokenrepo "go-auth/internal/repo/token"
-	"go-auth/internal/repo/user"
+	userrepo "go-auth/internal/repo/user"
 )
 
 // TTL для кода верификации email (15 минут)
@@ -39,6 +40,7 @@ var (
 	ErrInvalidVerificationCode   = errors.New("invalid or expired verification code")
 	ErrInvalidRequestID          = errors.New("invalid or expired requestId")
 	ErrInvalidPasswordResetToken = errors.New("invalid or expired password reset token")
+	ErrProfileNotFilled          = errors.New("profile not filled")
 )
 
 // LoginError - ошибка логина с дополнительной информацией
@@ -80,7 +82,8 @@ type AuthUseCase interface {
 
 // Auth - структура для аутентификации
 type auth struct {
-	userRepo         user.Repository
+	userRepo         userrepo.Repository
+	userClient       user.Client
 	tokenRepo        tokenrepo.Repository // Redis репозиторий для токенов
 	tokenService     token.JWTToken
 	mailer           email.Mailer // Email сервис для отправки писем
@@ -100,7 +103,8 @@ func GetBaseAuth(uc AuthUseCase) *auth {
 
 // NewAuthUseCase - конструктор для auth
 func NewAuthUseCase(
-	userRepo user.Repository,
+	userRepo userrepo.Repository,
+	userClient user.Client,
 	tokenRepo tokenrepo.Repository,
 	tokenSvc token.JWTToken,
 	mailer email.Mailer,
@@ -113,6 +117,7 @@ func NewAuthUseCase(
 	}
 	return &auth{
 		userRepo:         userRepo,
+		userClient:       userClient,
 		tokenRepo:        tokenRepo,
 		tokenService:     tokenSvc,
 		mailer:           mailer,
@@ -513,6 +518,23 @@ func (uc *auth) Login(email string, password string) (string, string, error) {
 	err = uc.tokenRepo.StoreRefreshToken(ctx, curUser.ID, refreshToken, uc.refreshTTL)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to store refresh token: %w", err)
+	}
+
+	// Проверяем, заполнен ли профиль
+	log.Printf("Checking profile existence for user %s at %s", curUser.ID, uc.userClient)
+	exists, err := uc.userClient.ProfileExists(ctx, curUser.ID)
+	if err != nil || !exists {
+		if err != nil {
+			log.Printf("Failed to check profile existence for user %s: %v", curUser.ID, err)
+		} else {
+			log.Printf("Profile not filled for user %s, returning 209 via LoginError", curUser.ID)
+		}
+		// Если профиль не заполнен или произошла ошибка проверки, 
+		// возвращаем токены но с ошибкой ErrProfileNotFilled
+		return accessToken, refreshToken, &LoginError{
+			Err:    ErrProfileNotFilled,
+			UserID: curUser.ID,
+		}
 	}
 
 	return accessToken, refreshToken, nil

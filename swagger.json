@@ -117,6 +117,16 @@
                 }
               }
             }
+          },
+          "209": {
+            "description": "Аутентификация успешна, но профиль пользователя не заполнен. Возвращает токены.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -840,7 +850,8 @@
             }
           }
         }
-      },
+      }
+    },
     "securitySchemes": {
       "BearerAuth": {
         "type": "http",

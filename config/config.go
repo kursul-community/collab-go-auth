@@ -31,6 +31,12 @@ type (
 		Health        HealthConfig        `yaml:"health"`        // Настройки health check
 		Metrics       MetricsConfig       `yaml:"metrics"`       // Настройки метрик
 		OAuth         OAuthConfig         `yaml:"oauth"`         // Настройки OAuth2
+		Services      ServicesConfig      `yaml:"services"`      // Внешние сервисы
+	}
+
+	// ServicesConfig - структура конфига внешних сервисов
+	ServicesConfig struct {
+		UserService string `yaml:"userService" env:"USER_SERVICE_ADDR" env-default:"localhost:60052"`
 	}
 
 	// AppConfig - структура конфига приложения

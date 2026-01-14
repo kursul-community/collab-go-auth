@@ -57,9 +57,14 @@
     - name: Login to GitHub Container Registry
       community.docker.docker_login:
         registry_url: "{{ registry }}"
-        username: "{{ lookup('env', 'GHCR_USERNAME') | default('github', true) }}"
-        password: "{{ lookup('env', 'GHCR_TOKEN') }}"
-      when: registry == 'ghcr.io' and lookup('env', 'GHCR_TOKEN') is defined
+        username: "{{ ghcr_username | default(lookup('env', 'GHCR_USERNAME')) | default('github', true) }}"
+        password: "{{ ghcr_token | default(lookup('env', 'GHCR_TOKEN')) }}"
+      when: registry == 'ghcr.io' and (ghcr_token is defined or lookup('env', 'GHCR_TOKEN') != "")
+
+    - name: Ensure collab-network exists
+      community.docker.docker_network:
+        name: collab-network
+        state: present
 
     - name: Down Auth
       community.docker.docker_compose_v2:
@@ -86,6 +91,8 @@
         OAUTH_GOOGLE_CLIENT_SECRET: "{{ lookup('env', 'OAUTH_GOOGLE_CLIENT_SECRET') }}"
         OAUTH_GITHUB_CLIENT_ID: "{{ lookup('env', 'OAUTH_GITHUB_CLIENT_ID') }}"
         OAUTH_GITHUB_CLIENT_SECRET: "{{ lookup('env', 'OAUTH_GITHUB_CLIENT_SECRET') }}"
+        OAUTH_FRONTEND_CALLBACK_URL: "{{ lookup('env', 'OAUTH_FRONTEND_CALLBACK_URL') }}"
+        OAUTH_BACKEND_BASE_URL: "{{ lookup('env', 'OAUTH_BACKEND_BASE_URL') }}"
 
     - name: Build and Up Auth
       community.docker.docker_compose_v2:
@@ -113,3 +120,5 @@
         OAUTH_GOOGLE_CLIENT_SECRET: "{{ lookup('env', 'OAUTH_GOOGLE_CLIENT_SECRET') }}"
         OAUTH_GITHUB_CLIENT_ID: "{{ lookup('env', 'OAUTH_GITHUB_CLIENT_ID') }}"
         OAUTH_GITHUB_CLIENT_SECRET: "{{ lookup('env', 'OAUTH_GITHUB_CLIENT_SECRET') }}"
+        OAUTH_FRONTEND_CALLBACK_URL: "{{ lookup('env', 'OAUTH_FRONTEND_CALLBACK_URL') }}"
+        OAUTH_BACKEND_BASE_URL: "{{ lookup('env', 'OAUTH_BACKEND_BASE_URL') }}" 

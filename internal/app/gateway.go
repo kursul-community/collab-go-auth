@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"go-auth/config"
@@ -44,6 +45,32 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 		// Извлекаем metadata из ServerMetadata
 		md, ok := runtime.ServerMetadataFromContext(ctx)
 		if ok {
+			// Проверяем наличие x-http-code в заголовках (разные варианты написания)
+			httpCodeHeader := md.HeaderMD.Get("x-http-code")
+			if len(httpCodeHeader) == 0 {
+				httpCodeHeader = md.HeaderMD.Get("X-Http-Code")
+			}
+			if len(httpCodeHeader) == 0 {
+				httpCodeHeader = md.HeaderMD.Get("Grpc-Metadata-X-Http-Code")
+			}
+
+			if len(httpCodeHeader) > 0 {
+				var code int
+				if n, _ := fmt.Sscanf(httpCodeHeader[0], "%d", &code); n > 0 && code != 0 {
+					// Устанавливаем статус код и пишем ответ вручную
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(code)
+
+					st, _ := status.FromError(err)
+					errorResponse := map[string]interface{}{
+						"code":    st.Code(),
+						"message": st.Message(),
+					}
+					json.NewEncoder(w).Encode(errorResponse)
+					return
+				}
+			}
+
 			// Проверяем наличие user-id и request-id в заголовках
 			if userID := md.HeaderMD.Get("user-id"); len(userID) > 0 {
 				w.Header().Set("X-User-Id", userID[0])
@@ -51,6 +78,8 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 			if requestID := md.HeaderMD.Get("request-id"); len(requestID) > 0 {
 				w.Header().Set("X-Request-Id", requestID[0])
 			}
+		} else {
+			log.Printf("Gateway customErrorHandler: failed to extract ServerMetadata from context for error: %v", err)
 		}
 
 		// Извлекаем userId и requestId из error details
@@ -163,10 +192,34 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 		return md
 	}
 
+	// Функция для обработки успешных ответов и установки кастомных HTTP кодов
+	forwardResponseOption := func(ctx context.Context, w http.ResponseWriter, resp proto.Message) error {
+		md, ok := runtime.ServerMetadataFromContext(ctx)
+		if !ok {
+			return nil
+		}
+
+		if codes := md.HeaderMD.Get("x-http-code"); len(codes) > 0 {
+			var code int
+			if n, _ := fmt.Sscanf(codes[0], "%d", &code); n > 0 && code != 0 {
+				w.WriteHeader(code)
+			}
+		}
+		return nil
+	}
+
 	// Создаем gRPC Gateway mux с кастомным error handler и metadata функцией
 	grpcMux := runtime.NewServeMux(
 		runtime.WithErrorHandler(customErrorHandler),
 		runtime.WithMetadata(metadataFunc),
+		runtime.WithForwardResponseOption(forwardResponseOption),
+		runtime.WithOutgoingHeaderMatcher(func(key string) (string, bool) {
+			// Пробрасываем x-http-code напрямую без префикса Grpc-Metadata-
+			if strings.ToLower(key) == "x-http-code" {
+				return "x-http-code", true
+			}
+			return runtime.DefaultHeaderMatcher(key)
+		}),
 	)
 
 	// Настройки для подключения к gRPC серверу
@@ -289,8 +342,26 @@ func cookieMiddleware(next http.Handler) http.Handler {
 		// Выполняем следующий handler
 		next.ServeHTTP(bw, r)
 
-		// Если статус успешный, парсим ответ и устанавливаем cookies
-		if bw.statusCode == http.StatusOK || bw.statusCode == 0 {
+		// Если статус успешный или 209 (профиль не заполнен), парсим ответ и устанавливаем cookies
+		if bw.statusCode == http.StatusOK || bw.statusCode == 0 || bw.statusCode == 209 {
+			// Проверяем наличие x-http-code в заголовках
+			// Проверяем все возможные варианты написания (из-за возможной нормализации прокси-серверами)
+			httpCode := bw.headers.Get("x-http-code")
+			if httpCode == "" {
+				httpCode = bw.headers.Get("X-Http-Code")
+			}
+			if httpCode == "" {
+				httpCode = bw.headers.Get("Grpc-Metadata-X-Http-Code")
+			}
+
+			if httpCode != "" {
+				var code int
+				if n, _ := fmt.Sscanf(httpCode, "%d", &code); n > 0 && code != 0 {
+					bw.statusCode = code
+					log.Printf("Gateway cookieMiddleware: override status code to %d from x-http-code header", code)
+				}
+			}
+
 			var response map[string]interface{}
 			if err := json.Unmarshal(bw.buf.Bytes(), &response); err == nil {
 				// gRPC-Gateway возвращает camelCase: accessToken, refreshToken

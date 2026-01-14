@@ -111,7 +111,8 @@ func (m *Manager) GetEnabledProviders() []ProviderInfo {
 
 // GetCallbackURL - формирует callback URL для провайдера
 func (m *Manager) GetCallbackURL(provider string) string {
-	return fmt.Sprintf("%s/api/v1/auth/oauth/%s/callback", m.config.BackendBaseURL, provider)
+	baseURL := strings.TrimSuffix(m.config.BackendBaseURL, "/")
+	return fmt.Sprintf("%s/api/v1/auth/oauth/%s/callback", baseURL, provider)
 }
 
 // GenerateState - генерирует случайный state для CSRF защиты

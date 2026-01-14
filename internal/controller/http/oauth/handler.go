@@ -2,6 +2,7 @@ package oauth
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -41,8 +42,35 @@ func (h *Handler) GetAuthURL(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("OAuth: GetAuthURL request for provider: %s", provider)
 
+	// Пытаемся получить frontendURL из заголовка Origin или Referer, 
+	// чтобы редирект был на правильный сайт
+	frontendURL := r.Header.Get("Origin")
+	if frontendURL == "" {
+		referer := r.Header.Get("Referer")
+		if referer != "" {
+			if u, err := url.Parse(referer); err == nil {
+				frontendURL = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
+			}
+		}
+	}
+
+	// Если мы получили Origin (например, http://localhost:5173), 
+	// добавляем путь для callback, если его нет
+	if frontendURL != "" {
+		// Извлекаем путь из конфига (например, /auth/callback)
+		configURL, err := url.Parse(h.frontendURL)
+		if err == nil {
+			frontendURL = strings.TrimSuffix(frontendURL, "/") + configURL.Path
+		}
+	}
+
+	// Если не удалось получить из заголовков, используем значение по умолчанию из конфига
+	if frontendURL == "" {
+		frontendURL = h.frontendURL
+	}
+
 	// Получаем URL авторизации
-	authURL, state, err := h.oauth.GetAuthURL(provider)
+	authURL, state, err := h.oauth.GetAuthURL(provider, frontendURL)
 	if err != nil {
 		log.Printf("OAuth: GetAuthURL error: %v", err)
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -97,15 +125,21 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Обрабатываем callback
-	accessToken, refreshToken, err := h.oauth.HandleCallback(provider, code, state)
+	accessToken, refreshToken, redirectURL, err := h.oauth.HandleCallback(provider, code, state)
 	if err != nil {
 		log.Printf("OAuth: Callback error: %v", err)
 		redirectWithError(w, r, h.frontendURL, "auth_failed", err.Error())
 		return
 	}
 
+	// Если в state был сохранен специфический URL для редиректа, используем его
+	finalFrontendURL := h.frontendURL
+	if redirectURL != "" {
+		finalFrontendURL = redirectURL
+	}
+
 	// Редиректим на фронтенд с токенами
-	redirectWithTokens(w, r, h.frontendURL, accessToken, refreshToken)
+	redirectWithTokens(w, r, finalFrontendURL, accessToken, refreshToken)
 }
 
 // GetProviders обрабатывает GET /api/v1/auth/oauth/providers
@@ -118,7 +152,30 @@ func (h *Handler) GetProviders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	providers, err := h.oauth.GetProviders()
+	// Пытаемся получить frontendURL из заголовка Origin или Referer
+	frontendURL := r.Header.Get("Origin")
+	if frontendURL == "" {
+		referer := r.Header.Get("Referer")
+		if referer != "" {
+			if u, err := url.Parse(referer); err == nil {
+				frontendURL = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
+			}
+		}
+	}
+
+	// Если мы получили Origin, добавляем путь для callback
+	if frontendURL != "" {
+		configURL, err := url.Parse(h.frontendURL)
+		if err == nil {
+			frontendURL = strings.TrimSuffix(frontendURL, "/") + configURL.Path
+		}
+	}
+
+	if frontendURL == "" {
+		frontendURL = h.frontendURL
+	}
+
+	providers, err := h.oauth.GetProviders(frontendURL)
 	if err != nil {
 		log.Printf("OAuth: GetProviders error: %v", err)
 		writeError(w, http.StatusInternalServerError, "failed to get providers")
