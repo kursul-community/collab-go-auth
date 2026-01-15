@@ -12,7 +12,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/go-auth
+  IMAGE_NAME: ${{ github.repository }}/collab-go-auth
 
 jobs:
   build:
@@ -46,9 +46,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=${{ github.sha }}
-            type=raw,value=dev-latest
-            type=sha
+            type=raw,value=latest
       
       - name: Build and push Docker image
         id: build
@@ -59,8 +57,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # cache-from: type=gha
+          # cache-to: type=gha,mode=max
 
   deploy:
     name: Deploy to Dev
