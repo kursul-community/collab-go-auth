@@ -1,65 +1,13 @@
-name: Build and Deploy (K8s)
+---
+- name: Deploy K8S-Auth
+  hosts: develop
+  become: no
+  remote_user: collab-user
 
-on:
-  push:
-    branches:
-      - main
-      - dev
-
-env:
-  REGISTRY: ghcr.io
-  # Имя образа в нижнем регистре
-  IMAGE_NAME: ${{ github.repository_owner }}/collab-go-auth
-
-jobs:
-  build-and-push:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=latest
-
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          # Кэширование для ускорения сборки
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  deploy-to-k8s:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    steps:
-      - name: Restart K8s Deployment
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: 45.132.177.32
-          username: collab-user # или ваш пользователь на сервере
-          key: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
-          script: |
-            # Перезапускаем деплоймент, чтобы он скачал новый образ :latest
-            sudo kubectl rollout restart deployment collab-go-auth -n collab
-            # Ждем завершения обновления (опционально)
-            sudo kubectl rollout status deployment collab-go-auth -n collab
+  tasks:
+    - name: Apply Kubernetes Manifests
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('file', item) }}"
+      loop:
+        - "../../../collab-k8s-infra/apps/auth.yaml"
