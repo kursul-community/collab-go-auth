@@ -9,7 +9,7 @@ on:
 env:
   REGISTRY: ghcr.io
   # Имя образа в нижнем регистре
-  IMAGE_NAME: ilya0217/collab-go-auth
+  IMAGE_NAME: ${{ github.repository }} 
 
 jobs:
   build-and-push:
