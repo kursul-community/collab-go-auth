@@ -1,128 +1,65 @@
----
-- name: Deploy Auth
-  hosts: develop
-  become: no
-  remote_user: collab-user
+name: Build and Deploy (K8s)
 
-  tasks: 
-    - name: Ensure deployment directory exists
-      ansible.builtin.file:
-        path: "{{ deploy_path }}"
-        state: directory
-        mode: "0755"
+on:
+  push:
+    branches:
+      - main
+      - dev
 
-      
-    - name: Ensure infra directory 
-      ansible.builtin.file:
-        path: "{{ deploy_path }}/infra"
-        state: directory
-        mode: "0755"
-        # owner: collab-user
-        # group: collab-user
+env:
+  REGISTRY: ghcr.io
+  # Имя образа в нижнем регистре
+  IMAGE_NAME: ${{ github.repository_owner }}/collab-go-auth
 
-    - name: Copy docker compose file
-      ansible.builtin.copy:
-        src: "{{ compose_file }}"
-        dest: "{{ deploy_path }}/docker-compose.dev.yml"
-        mode: "0644"
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
-    - name: Ensure config directory exists
-      ansible.builtin.file:
-        path: "{{ deploy_path }}/config"
-        state: directory
-        mode: "0755"
-        # owner: collab-user
-        # group: collab-user
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Copy config file
-      ansible.builtin.copy:
-        src: ../../config/config.yaml
-        dest: "{{ deploy_path }}/config/config.yaml"
-        mode: "0644"
-        # owner: collab-user
-        # group: collab-user
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-    # - name: Copy nginx file
-    #   ansible.builtin.copy:
-    #     src: "{{ nginx_file }}"
-    #     dest: "{{ deploy_path }}/nginx/auth.conf"
-    #     mode: "0644"
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
 
-    - name: Extract registry, image name and tag from backend_image
-      set_fact:
-        registry: "{{ backend_image.split('/')[0] if backend_image and '/' in backend_image else 'ghcr.io' }}"
-        image_name: "{{ backend_image.split('/')[1:] | join('/') | regex_replace(':[^:]*$', '') if '/' in backend_image else backend_image.split(':')[0] }}"
-        image_tag: "{{ backend_image.split(':')[-1] if ':' in backend_image else 'latest' }}"
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Кэширование для ускорения сборки
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-    - name: Get GHCR token
-      set_fact:
-        ghcr_token_value: "{{ ghcr_token | default(lookup('env', 'GHCR_TOKEN') | default('', true)) }}"
-
-    - name: Login to GitHub Container Registry
-      community.docker.docker_login:
-        registry_url: "{{ registry }}"
-        username: "{{ ghcr_username | default(lookup('env', 'GHCR_USERNAME') | default('github', true)) }}"
-        password: "{{ ghcr_token_value }}"
-      when: registry == 'ghcr.io' and ghcr_token_value | length > 0
-      
-    - name: Ensure collab-network exists
-      community.docker.docker_network:
-        name: collab-network
-        state: present
-
-    - name: Down Auth
-      community.docker.docker_compose_v2:
-        project_src: "{{ deploy_path }}"
-        files:
-          - docker-compose.dev.yml
-        state: absent
-      environment:
-        REGISTRY: "{{ registry }}"
-        IMAGE_NAME: "{{ image_name }}"
-        BACKEND_IMAGE_TAG: "{{ image_tag }}"
-        PG_USER: "{{ lookup('env', 'PG_USER') }}"
-        PG_PASSWORD: "{{ lookup('env', 'PG_PASSWORD') }}"
-        PG_HOST: "{{ lookup('env', 'PG_HOST') }}"
-        PG_PORT: "{{ lookup('env', 'PG_PORT') }}"
-        PG_DBNAME: "{{ lookup('env', 'PG_DBNAME') }}"
-        TOKEN_SECRET: "{{ lookup('env', 'TOKEN_SECRET') }}"
-        DB_MAX_CONNS: "{{ lookup('env', 'DB_MAX_CONNS') }}"
-        DB_CONN_TIMEOUT: "{{ lookup('env', 'DB_CONN_TIMEOUT') }}"
-        MIGRATIONS_PATH: "{{ lookup('env', 'MIGRATIONS_PATH') }}"
-        REDIS_HOST: "{{ lookup('env', 'REDIS_HOST') }}"
-        REDIS_PORT: "{{ lookup('env', 'REDIS_PORT') }}"
-        OAUTH_GOOGLE_CLIENT_ID: "{{ lookup('env', 'OAUTH_GOOGLE_CLIENT_ID') }}"
-        OAUTH_GOOGLE_CLIENT_SECRET: "{{ lookup('env', 'OAUTH_GOOGLE_CLIENT_SECRET') }}"
-        OAUTH_GITHUB_CLIENT_ID: "{{ lookup('env', 'OAUTH_GITHUB_CLIENT_ID') }}"
-        OAUTH_GITHUB_CLIENT_SECRET: "{{ lookup('env', 'OAUTH_GITHUB_CLIENT_SECRET') }}"
-        OAUTH_FRONTEND_CALLBACK_URL: "{{ lookup('env', 'OAUTH_FRONTEND_CALLBACK_URL') }}"
-        OAUTH_BACKEND_BASE_URL: "{{ lookup('env', 'OAUTH_BACKEND_BASE_URL') }}"
-
-    - name: Build and Up Auth
-      community.docker.docker_compose_v2:
-        project_src: "{{ deploy_path }}"
-        files:
-          - docker-compose.dev.yml
-        state: present
-        pull: always
-      environment:
-        REGISTRY: "{{ registry }}"
-        IMAGE_NAME: "{{ image_name }}"
-        BACKEND_IMAGE_TAG: "{{ image_tag }}"
-        PG_USER: "{{ lookup('env', 'PG_USER') }}"
-        PG_PASSWORD: "{{ lookup('env', 'PG_PASSWORD') }}"
-        PG_HOST: "{{ lookup('env', 'PG_HOST') }}"
-        PG_PORT: "{{ lookup('env', 'PG_PORT') }}"
-        PG_DBNAME: "{{ lookup('env', 'PG_DBNAME') }}"
-        TOKEN_SECRET: "{{ lookup('env', 'TOKEN_SECRET') }}"
-        DB_MAX_CONNS: "{{ lookup('env', 'DB_MAX_CONNS') }}"
-        DB_CONN_TIMEOUT: "{{ lookup('env', 'DB_CONN_TIMEOUT') }}"
-        MIGRATIONS_PATH: "{{ lookup('env', 'MIGRATIONS_PATH') }}"
-        REDIS_HOST: "{{ lookup('env', 'REDIS_HOST') }}"
-        REDIS_PORT: "{{ lookup('env', 'REDIS_PORT') }}"
-        OAUTH_GOOGLE_CLIENT_ID: "{{ lookup('env', 'OAUTH_GOOGLE_CLIENT_ID') }}"
-        OAUTH_GOOGLE_CLIENT_SECRET: "{{ lookup('env', 'OAUTH_GOOGLE_CLIENT_SECRET') }}"
-        OAUTH_GITHUB_CLIENT_ID: "{{ lookup('env', 'OAUTH_GITHUB_CLIENT_ID') }}"
-        OAUTH_GITHUB_CLIENT_SECRET: "{{ lookup('env', 'OAUTH_GITHUB_CLIENT_SECRET') }}"
-        OAUTH_FRONTEND_CALLBACK_URL: "{{ lookup('env', 'OAUTH_FRONTEND_CALLBACK_URL') }}"
-        OAUTH_BACKEND_BASE_URL: "{{ lookup('env', 'OAUTH_BACKEND_BASE_URL') }}" 
+  deploy-to-k8s:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restart K8s Deployment
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 45.132.177.32
+          username: collab-user # или ваш пользователь на сервере
+          key: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
+          script: |
+            # Перезапускаем деплоймент, чтобы он скачал новый образ :latest
+            sudo kubectl rollout restart deployment collab-go-auth -n collab
+            # Ждем завершения обновления (опционально)
+            sudo kubectl rollout status deployment collab-go-auth -n collab
