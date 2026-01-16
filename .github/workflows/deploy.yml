@@ -9,7 +9,7 @@ on:
 env:
   REGISTRY: ghcr.io
   # Имя образа в нижнем регистре
-  IMAGE_NAME: ${{ github.repository_owner }}/collab-go-auth
+  IMAGE_NAME: ilya0217/collab-go-auth
 
 jobs:
   build-and-push:
@@ -48,18 +48,15 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy-to-k8s:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    steps:
-      - name: Restart K8s Deployment
+      - name: Restart Kubernetes Deployment
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: 45.132.177.32
-          username: collab-user # или ваш пользователь на сервере
+          username: collab-user
           key: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
           script: |
-            # Перезапускаем деплоймент, чтобы он скачал новый образ :latest
+            # Для collab-go-auth используйте это имя:
             sudo kubectl rollout restart deployment collab-go-auth -n collab
-            # Ждем завершения обновления (опционально)
-            sudo kubectl rollout status deployment collab-go-auth -n collab
+            
+            # Для collab-user-service замените имя выше на:
+            # sudo kubectl rollout restart deployment collab-user-service -n collab
