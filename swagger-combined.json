@@ -1,0 +1,490 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+      "title": "Collab API",
+      "description": "Unified API for Auth and User services",
+      "version": "1.0.0"
+    },
+    "servers": [
+      {
+        "url": "/api/v1",
+        "description": "API server"
+      }
+    ],
+    "paths": {
+      "/auth/register": {
+        "post": {
+          "tags": ["Auth"],
+          "summary": "Регистрация пользователя",
+          "operationId": "register",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RegisterRequest" }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Успешная регистрация",
+              "content": {
+                "application/json": {
+                  "schema": { "$ref": "#/components/schemas/RegisterResponse" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/auth/login": {
+        "post": {
+          "tags": ["Auth"],
+          "summary": "Вход в систему",
+          "operationId": "login",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/LoginRequest" }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Успешный вход",
+              "content": {
+                "application/json": {
+                  "schema": { "$ref": "#/components/schemas/LoginResponse" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/auth/refresh": {
+        "post": {
+          "tags": ["Auth"],
+          "summary": "Обновление access токена",
+          "operationId": "refreshToken",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RefreshTokenRequest" }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Токен обновлён",
+              "content": {
+                "application/json": {
+                  "schema": { "$ref": "#/components/schemas/RefreshTokenResponse" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/auth/validate": {
+        "post": {
+          "tags": ["Auth"],
+          "summary": "Проверка access токена",
+          "operationId": "validateToken",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ValidateTokenRequest" }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Результат проверки",
+              "content": {
+                "application/json": {
+                  "schema": { "$ref": "#/components/schemas/ValidateTokenResponse" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/auth/sign-up/verify-email": {
+        "post": {
+          "tags": ["Email Verification"],
+          "summary": "Верификация email",
+          "operationId": "verifyEmail",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/VerifyEmailRequest" }
+              }
+            }
+          },
+          "responses": {
+            "200": { "description": "Email подтверждён" }
+          }
+        }
+      },
+      "/auth/sign-up/resend-email": {
+        "post": {
+          "tags": ["Email Verification"],
+          "summary": "Повторная отправка кода",
+          "operationId": "resendVerificationEmail",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ResendVerificationEmailRequest" }
+              }
+            }
+          },
+          "responses": {
+            "200": { "description": "Код отправлен" }
+          }
+        }
+      },
+      "/auth/restore-password/begin": {
+        "post": {
+          "tags": ["Password Recovery"],
+          "summary": "Начало восстановления пароля",
+          "operationId": "restorePasswordBegin",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RestorePasswordBeginRequest" }
+              }
+            }
+          },
+          "responses": {
+            "200": { "description": "Письмо отправлено" }
+          }
+        }
+      },
+      "/auth/restore-password/complete": {
+        "post": {
+          "tags": ["Password Recovery"],
+          "summary": "Завершение восстановления пароля",
+          "operationId": "restorePasswordComplete",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RestorePasswordCompleteRequest" }
+              }
+            }
+          },
+          "responses": {
+            "200": { "description": "Пароль изменён" }
+          }
+        }
+      },
+      "/auth/oauth/providers": {
+        "get": {
+          "tags": ["OAuth2"],
+          "summary": "Список OAuth2 провайдеров",
+          "operationId": "oauthListProviders",
+          "responses": {
+            "200": {
+              "description": "Список провайдеров",
+              "content": {
+                "application/json": {
+                  "schema": { "$ref": "#/components/schemas/OAuthProvidersListResponse" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/auth/oauth/{provider}": {
+        "get": {
+          "tags": ["OAuth2"],
+          "summary": "URL авторизации провайдера",
+          "operationId": "oauthGetAuthUrl",
+          "parameters": [
+            {
+              "name": "provider",
+              "in": "path",
+              "required": true,
+              "schema": { "type": "string", "enum": ["google", "github", "yandex", "vk"] }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "URL для редиректа",
+              "content": {
+                "application/json": {
+                  "schema": { "$ref": "#/components/schemas/OAuthAuthUrlResponse" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/user/me": {
+        "get": {
+          "tags": ["User Profile"],
+          "summary": "Получить свой профиль",
+          "operationId": "getMyProfile",
+          "security": [{ "BearerAuth": [] }],
+          "responses": {
+            "200": {
+              "description": "Данные профиля",
+              "content": {
+                "application/json": {
+                  "schema": { "$ref": "#/components/schemas/GetMyProfileResponse" }
+                }
+              }
+            },
+            "209": { "description": "Профиль не заполнен" },
+            "401": { "description": "Неавторизован" }
+          }
+        }
+      },
+      "/user/create-profile": {
+        "post": {
+          "tags": ["User Profile"],
+          "summary": "Создать или обновить профиль",
+          "operationId": "createProfile",
+          "security": [{ "BearerAuth": [] }],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UpdateProfileRequest" }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Профиль обновлён",
+              "content": {
+                "application/json": {
+                  "schema": { "$ref": "#/components/schemas/UpdateProfileResponse" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/user/profile/{user_id}": {
+        "get": {
+          "tags": ["User Profile"],
+          "summary": "Получить профиль по ID",
+          "operationId": "getProfile",
+          "parameters": [
+            {
+              "name": "user_id",
+              "in": "path",
+              "required": true,
+              "schema": { "type": "string" }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Данные профиля",
+              "content": {
+                "application/json": {
+                  "schema": { "$ref": "#/components/schemas/GetProfileResponse" }
+                }
+              }
+            },
+            "404": { "description": "Профиль не найден" }
+          }
+        }
+      },
+      "/user/positions": {
+        "get": {
+          "tags": ["User Metadata"],
+          "summary": "Список доступных позиций",
+          "operationId": "getPositions",
+          "responses": {
+            "200": {
+              "description": "Список позиций",
+              "content": {
+                "application/json": {
+                  "schema": { "$ref": "#/components/schemas/GetPositionsResponse" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "components": {
+      "schemas": {
+        "RegisterRequest": {
+          "type": "object",
+          "required": ["email", "password"],
+          "properties": {
+            "email": { "type": "string", "format": "email" },
+            "password": { "type": "string", "minLength": 6 }
+          }
+        },
+        "RegisterResponse": {
+          "type": "object",
+          "properties": {
+            "user_id": { "type": "string", "format": "uuid" },
+            "request_id": { "type": "string", "format": "uuid" }
+          }
+        },
+        "LoginRequest": {
+          "type": "object",
+          "required": ["email", "password"],
+          "properties": {
+            "email": { "type": "string", "format": "email" },
+            "password": { "type": "string" }
+          }
+        },
+        "LoginResponse": {
+          "type": "object",
+          "properties": {
+            "accessToken": { "type": "string" },
+            "refreshToken": { "type": "string" }
+          }
+        },
+        "RefreshTokenRequest": {
+          "type": "object",
+          "properties": {
+            "refreshToken": { "type": "string" }
+          }
+        },
+        "RefreshTokenResponse": {
+          "type": "object",
+          "properties": {
+            "accessToken": { "type": "string" }
+          }
+        },
+        "ValidateTokenRequest": {
+          "type": "object",
+          "properties": {
+            "access_token": { "type": "string" }
+          }
+        },
+        "ValidateTokenResponse": {
+          "type": "object",
+          "properties": {
+            "valid": { "type": "boolean" }
+          }
+        },
+        "VerifyEmailRequest": {
+          "type": "object",
+          "required": ["user_id", "request_id", "code"],
+          "properties": {
+            "user_id": { "type": "string", "format": "uuid" },
+            "request_id": { "type": "string", "format": "uuid" },
+            "code": { "type": "string", "pattern": "^[0-9]{6}$" }
+          }
+        },
+        "ResendVerificationEmailRequest": {
+          "type": "object",
+          "required": ["user_id", "request_id"],
+          "properties": {
+            "user_id": { "type": "string", "format": "uuid" },
+            "request_id": { "type": "string", "format": "uuid" }
+          }
+        },
+        "RestorePasswordBeginRequest": {
+          "type": "object",
+          "required": ["email"],
+          "properties": {
+            "email": { "type": "string", "format": "email" }
+          }
+        },
+        "RestorePasswordCompleteRequest": {
+          "type": "object",
+          "required": ["user_id", "request_id", "password"],
+          "properties": {
+            "user_id": { "type": "string", "format": "uuid" },
+            "request_id": { "type": "string", "format": "uuid" },
+            "password": { "type": "string", "minLength": 6 }
+          }
+        },
+        "OAuthAuthUrlResponse": {
+          "type": "object",
+          "properties": {
+            "displayName": { "type": "string" },
+            "auth_url": { "type": "string", "format": "uri" },
+            "state": { "type": "string" }
+          }
+        },
+        "OAuthProvidersListResponse": {
+          "type": "object",
+          "properties": {
+            "providers": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/OAuthAuthUrlResponse" }
+            }
+          }
+        },
+        "UserProfile": {
+          "type": "object",
+          "properties": {
+            "user_id": { "type": "string" },
+            "username": { "type": "string" },
+            "about_info": { "type": "string" },
+            "git_url": { "type": "string" },
+            "position": { "type": "string" },
+            "created_at": { "type": "string" },
+            "updated_at": { "type": "string" }
+          }
+        },
+        "UpdateProfileRequest": {
+          "type": "object",
+          "properties": {
+            "username": { "type": "string" },
+            "about_info": { "type": "string" },
+            "git_url": { "type": "string" },
+            "position": { "type": "string" }
+          }
+        },
+        "UpdateProfileResponse": {
+          "type": "object",
+          "properties": {
+            "status": { "type": "string" }
+          }
+        },
+        "GetMyProfileResponse": {
+          "type": "object",
+          "properties": {
+            "profile": { "$ref": "#/components/schemas/UserProfile" }
+          }
+        },
+        "GetProfileResponse": {
+          "type": "object",
+          "properties": {
+            "profile": { "$ref": "#/components/schemas/UserProfile" }
+          }
+        },
+        "GetPositionsResponse": {
+          "type": "object",
+          "properties": {
+            "positions": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        }
+      },
+      "securitySchemes": {
+        "BearerAuth": {
+          "type": "http",
+          "scheme": "bearer",
+          "bearerFormat": "JWT"
+        }
+      }
+    },
+    "tags": [
+      { "name": "Auth", "description": "Аутентификация" },
+      { "name": "Email Verification", "description": "Верификация email" },
+      { "name": "Password Recovery", "description": "Восстановление пароля" },
+      { "name": "OAuth2", "description": "OAuth2 авторизация" },
+      { "name": "User Profile", "description": "Профили пользователей" },
+      { "name": "User Metadata", "description": "Метаданные" }
+    ]
+  }

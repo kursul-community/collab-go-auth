@@ -272,11 +272,40 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 		logger.Printf("OAuth routes registered")
 	}
 
+	// Swagger UI (использует CDN)
+	mainMux.HandleFunc("/api/v1/swagger", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write([]byte(`<!DOCTYPE html>
+	<html>
+	<head>
+		<title>Collab API - Swagger UI</title>
+		<link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css" />
+	</head>
+	<body>
+		<div id="swagger-ui"></div>
+		<script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js"></script>
+		<script>
+			window.onload = () => {
+				SwaggerUIBundle({
+					url: '/api/v1/swagger/spec',
+					dom_id: '#swagger-ui'
+				});
+			};
+		</script>
+	</body>
+	</html>`))
+	})
+	// Swagger JSON spec
+	mainMux.HandleFunc("/api/v1/swagger/spec", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		http.ServeFile(w, r, "./swagger-combined.json")
+	})
+
 	// gRPC Gateway обрабатывает остальные запросы
 	mainMux.Handle("/", grpcMux)
 
 	// Настраиваем цепочку middleware: CORS -> Cookie -> Handler
-	handler := corsMiddleware(cookieMiddleware(mainMux))
+	handler := corsMiddleware(cfg, cookieMiddleware(cfg, mainMux))
 
 	// Запускаем HTTP сервер
 	httpAddr := fmt.Sprintf(":%d", cfg.HTTP.Port)
@@ -294,22 +323,34 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 }
 
 // corsMiddleware - добавляет CORS заголовки для фронта
-func corsMiddleware(next http.Handler) http.Handler {
+func corsMiddleware(cfg *config.Config, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-		if origin == "" {
-			origin = "*"
+		allowedOrigins := cfg.CORS.AllowedOrigins
+
+		isAllowed := false
+		if origin != "" {
+			for _, allowed := range allowedOrigins {
+				if allowed == "*" || allowed == origin {
+					isAllowed = true
+					break
+				}
+			}
 		}
 
-		// Устанавливаем CORS заголовки
-		w.Header().Set("Access-Control-Allow-Origin", origin)
+		if isAllowed {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+		} else if len(allowedOrigins) > 0 && allowedOrigins[0] == "*" {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+		}
+
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		w.Header().Set("Access-Control-Allow-Credentials", "true") // Разрешаем cookies
-		// Не устанавливаем Content-Type здесь - grpc-gateway установит его сам для правильной сериализации ошибок
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID")
+		w.Header().Set("Access-Control-Expose-Headers", "X-Request-ID")
 
 		// Обрабатываем preflight запросы
-		if r.Method == "OPTIONS" {
+		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
@@ -319,8 +360,11 @@ func corsMiddleware(next http.Handler) http.Handler {
 }
 
 // cookieMiddleware - устанавливает токены в cookies для /auth/login и /auth/refresh
-func cookieMiddleware(next http.Handler) http.Handler {
+func cookieMiddleware(cfg *config.Config, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Определяем, безопасное ли соединение (TLS или HTTPS за прокси)
+		isHTTPS := r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+
 		// Проверяем, нужно ли обрабатывать этот путь
 		path := r.URL.Path
 		isLoginPath := strings.HasSuffix(path, "/auth/login")
@@ -344,8 +388,7 @@ func cookieMiddleware(next http.Handler) http.Handler {
 
 		// Если статус успешный или 209 (профиль не заполнен), парсим ответ и устанавливаем cookies
 		if bw.statusCode == http.StatusOK || bw.statusCode == 0 || bw.statusCode == 209 {
-			// Проверяем наличие x-http-code в заголовках
-			// Проверяем все возможные варианты написания (из-за возможной нормализации прокси-серверами)
+			// ... (логика извлечения x-http-code остается прежней)
 			httpCode := bw.headers.Get("x-http-code")
 			if httpCode == "" {
 				httpCode = bw.headers.Get("X-Http-Code")
@@ -358,14 +401,27 @@ func cookieMiddleware(next http.Handler) http.Handler {
 				var code int
 				if n, _ := fmt.Sscanf(httpCode, "%d", &code); n > 0 && code != 0 {
 					bw.statusCode = code
-					log.Printf("Gateway cookieMiddleware: override status code to %d from x-http-code header", code)
 				}
 			}
 
 			var response map[string]interface{}
 			if err := json.Unmarshal(bw.buf.Bytes(), &response); err == nil {
-				// gRPC-Gateway возвращает camelCase: accessToken, refreshToken
-				// Проверяем оба варианта для совместимости
+				// Определяем настройки cookies в зависимости от окружения
+				isDev := cfg != nil && cfg.App.IsDevelopment()
+				sameSite := http.SameSiteLaxMode
+				secure := isHTTPS
+				if isDev {
+					// В dev хотим SameSite=None, но браузер требует Secure.
+					// Если HTTPS нет, используем Lax, иначе браузер отвергнет Set-Cookie.
+					if isHTTPS {
+						sameSite = http.SameSiteNoneMode
+						secure = true
+					} else {
+						sameSite = http.SameSiteLaxMode
+						secure = false
+					}
+				}
+
 				accessToken := getStringField(response, "accessToken", "access_token")
 				if accessToken != "" {
 					http.SetCookie(w, &http.Cookie{
@@ -373,14 +429,13 @@ func cookieMiddleware(next http.Handler) http.Handler {
 						Value:    accessToken,
 						Path:     "/",
 						HttpOnly: true,
-						Secure:   false, // true для HTTPS в production
-						SameSite: http.SameSiteLaxMode,
+						Secure:   secure,
+						SameSite: sameSite,
 						MaxAge:   AccessTokenMaxAge,
 					})
 				}
 
 				// Устанавливаем refresh_token в cookie (только для login)
-				// HttpOnly: false - чтобы фронтенд мог читать токен для обновления
 				if isLoginPath {
 					refreshToken := getStringField(response, "refreshToken", "refresh_token")
 					if refreshToken != "" {
@@ -388,9 +443,9 @@ func cookieMiddleware(next http.Handler) http.Handler {
 							Name:     RefreshTokenCookieName,
 							Value:    refreshToken,
 							Path:     "/",
-							HttpOnly: false, // Доступен из JavaScript
-							Secure:   false, // true для HTTPS в production
-							SameSite: http.SameSiteLaxMode,
+							HttpOnly: true, // Безопаснее сделать HttpOnly
+							Secure:   secure,
+							SameSite: sameSite,
 							MaxAge:   RefreshTokenMaxAge,
 						})
 					}
@@ -398,24 +453,18 @@ func cookieMiddleware(next http.Handler) http.Handler {
 			}
 		}
 
-		// Копируем заголовки из буфера (важно делать это до WriteHeader)
-		// grpc-gateway устанавливает заголовки через Header(), поэтому они должны быть в bw.headers
+		// Копируем заголовки и записываем ответ
 		for key, values := range bw.headers {
 			for _, value := range values {
 				w.Header().Set(key, value)
 			}
 		}
 
-		// Записываем статус код (важно делать это перед записью тела)
-		// grpc-gateway устанавливает статус код через WriteHeader()
 		if bw.statusCode != 0 {
 			w.WriteHeader(bw.statusCode)
 		} else {
-			// Если статус не установлен, устанавливаем 200 по умолчанию
 			w.WriteHeader(http.StatusOK)
 		}
-
-		// Записываем тело ответа (включая ошибки в формате gRPC с code, message, details)
 		w.Write(bw.buf.Bytes())
 	})
 }
