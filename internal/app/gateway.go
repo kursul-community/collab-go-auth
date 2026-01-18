@@ -4,6 +4,7 @@ package app
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -344,7 +345,7 @@ func corsMiddleware(cfg *config.Config, next http.Handler) http.Handler {
 		}
 
 		if isAllowed {
-		w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 		} else if len(allowedOrigins) > 0 && allowedOrigins[0] == "*" {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
