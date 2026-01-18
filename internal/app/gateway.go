@@ -24,6 +24,9 @@ import (
 	oauthhttp "go-auth/internal/controller/http/oauth"
 )
 
+//go:embed swagger-combined.json
+var swaggerJSON []byte
+
 // Константы для cookies
 const (
 	AccessTokenCookieName  = "access_token"
@@ -271,6 +274,37 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 
 		logger.Printf("OAuth routes registered")
 	}
+
+	mainMux.HandleFunc("/api/v1/swagger", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write([]byte(`<!DOCTYPE html>
+	<html>
+	<head>
+		<title>Collab API - Swagger UI</title>
+		<link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css" />
+	</head>
+	<body>
+		<div id="swagger-ui"></div>
+		<script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js"></script>
+		<script>
+			window.onload = () => {
+				SwaggerUIBundle({
+					url: '/api/v1/swagger/spec',
+					dom_id: '#swagger-ui',
+					presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+					layout: "StandaloneLayout"
+				});
+			};
+		</script>
+	</body>
+	</html>`))
+	})
+
+	// Swagger JSON spec
+	mainMux.HandleFunc("/api/v1/swagger/spec", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		http.ServeFile(w, r, "./swagger-combined.json")
+	})
 
 	// gRPC Gateway обрабатывает остальные запросы
 	mainMux.Handle("/", grpcMux)

@@ -37,6 +37,7 @@ COPY --from=builder /migrate /app/migrate
 # Копируем конфигурационный файл и директорию с миграциями
 COPY config/config.yaml /app/config/config.yaml
 COPY migrations /app/migrations
+COPY swagger-combined.json /app/swagger-combined.json
 
 # Указываем порт, на котором работает приложение
 EXPOSE 60051
