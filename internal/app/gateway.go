@@ -4,7 +4,6 @@ package app
 import (
 	"bytes"
 	"context"
-	_ "embed"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -24,9 +23,6 @@ import (
 	"go-auth/gen/auth"
 	oauthhttp "go-auth/internal/controller/http/oauth"
 )
-
-//go:embed swagger-combined.json
-var swaggerJSON []byte
 
 // Константы для cookies
 const (
