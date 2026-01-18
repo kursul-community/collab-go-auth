@@ -362,6 +362,9 @@ func corsMiddleware(cfg *config.Config, next http.Handler) http.Handler {
 // cookieMiddleware - устанавливает токены в cookies для /auth/login и /auth/refresh
 func cookieMiddleware(cfg *config.Config, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Определяем, безопасное ли соединение (TLS или HTTPS за прокси)
+		isHTTPS := r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+
 		// Проверяем, нужно ли обрабатывать этот путь
 		path := r.URL.Path
 		isLoginPath := strings.HasSuffix(path, "/auth/login")
@@ -404,12 +407,20 @@ func cookieMiddleware(cfg *config.Config, next http.Handler) http.Handler {
 			var response map[string]interface{}
 			if err := json.Unmarshal(bw.buf.Bytes(), &response); err == nil {
 				// Определяем настройки cookies в зависимости от окружения
-				// isProd := cfg.App.Env == "production"
+				isDev := cfg != nil && cfg.App.IsDevelopment()
 				sameSite := http.SameSiteLaxMode
-				secure := false
-				// if isProd {
-				// 	sameSite = http.SameSiteNoneMode // Для кросс-доменных запросов в прод
-				// }
+				secure := isHTTPS
+				if isDev {
+					// В dev хотим SameSite=None, но браузер требует Secure.
+					// Если HTTPS нет, оставляем Lax, иначе куки будут отброшены.
+					if isHTTPS {
+						sameSite = http.SameSiteNoneMode
+						secure = true
+					} else {
+						sameSite = http.SameSiteLaxMode
+						secure = false
+					}
+				}
 
 				accessToken := getStringField(response, "accessToken", "access_token")
 				if accessToken != "" {
@@ -418,7 +429,7 @@ func cookieMiddleware(cfg *config.Config, next http.Handler) http.Handler {
 						Value:    accessToken,
 						Path:     "/",
 						HttpOnly: true,
-						Secure:   secure, // true только для HTTPS
+						Secure:   secure,
 						SameSite: sameSite,
 						MaxAge:   AccessTokenMaxAge,
 					})
