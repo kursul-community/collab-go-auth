@@ -1,136 +1,69 @@
-name: Build and Deploy
+name: Build and Deploy (K8s)
 
 on:
   push:
     branches:
-      - dev
       - main
-  pull_request:
-    branches:
       - dev
-      - main
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/go-auth 
+  # Имя образа в нижнем регистре
+  IMAGE_NAME: ${{ github.repository }} 
 
 jobs:
-  build:
-    name: Build Docker Image
+  build-and-push:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-    
-    outputs:
-      image-tag: ${{ steps.meta.outputs.tags }}
-      image-digest: ${{ steps.build.outputs.digest }}
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      
-      - name: Log in to GitHub Container Registry
+
+      - name: Lowercase image name
+        run: |
+          echo "IMAGE_NAME_LOWER=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}
           tags: |
-            type=raw,value=${{ github.sha }}
-            type=raw,value=dev-latest
-            type=sha
-      
-      - name: Build and push Docker image
-        id: build
+            type=raw,value=latest
+
+      - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Кэширование для ускорения сборки
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy:
-    name: Deploy to Dev
-    runs-on: ubuntu-latest
-    needs: build
-    permissions:
-      contents: read
-      packages: read
-    if: |
-      (github.event_name == 'push' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main')) ||
-      (github.event_name == 'pull_request' && (github.base_ref == 'dev' || github.base_ref == 'main'))
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Restart Kubernetes Deployment
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          python-version: '3.11'
-      
-      - name: Install Ansible
-        run: |
-          pip install ansible
-          pip install ansible-lint
-          ansible-galaxy collection install community.docker
-      
-      - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
-      
-      - name: Configure SSH known_hosts
-        run: |
-          ssh-keyscan -H 45.132.177.32 >> ~/.ssh/known_hosts
-      
-      - name: Set image tag environment variable
-        run: |
-          echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
-          echo "IMAGE_NAME_LOWER=$(echo ${{ env.IMAGE_NAME }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
-      
-      - name: Run Ansible playbook
-        env:
-          GITHUB_SHA: ${{ github.sha }}
-          ANSIBLE_HOST_KEY_CHECKING: False
-          ANSIBLE_STDOUT_CALLBACK: yaml
-          # Organization Variables
-          PG_HOST: ${{ vars.PG_HOST }}
-          PG_PORT: ${{ vars.PG_PORT }}
-          REDIS_HOST: ${{ vars.REDIS_HOST }}
-          REDIS_PORT: ${{ vars.REDIS_PORT }}
-          DB_MAX_CONNS: ${{ vars.DB_MAX_CONNS }}
-          DB_CONN_TIMEOUT: ${{ vars.DB_CONN_TIMEOUT }}
-          MIGRATIONS_PATH: ${{ vars.MIGRATIONS_PATH }}
-          # Organization Secrets
-          PG_USER: ${{ secrets.PG_USER }}
-          PG_PASSWORD: ${{ secrets.PG_PASSWORD }}
-          PG_DBNAME: ${{ secrets.PG_DBNAME }}
-          TOKEN_SECRET: ${{ secrets.TOKEN_SECRET }}
-          OAUTH_GOOGLE_CLIENT_ID: ${{ secrets.OAUTH_GOOGLE_CLIENT_ID }}
-          OAUTH_GOOGLE_CLIENT_SECRET: ${{ secrets.OAUTH_GOOGLE_CLIENT_SECRET }}
-          OAUTH_GITHUB_CLIENT_ID: ${{ secrets.OAUTH_GITHUB_CLIENT_ID }}
-          OAUTH_GITHUB_CLIENT_SECRET: ${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GHCR_USERNAME: ${{ github.actor }}
-        run: |
-          ansible-playbook \
-            -i inventories/dev/inventory.ini \
-            playbooks/dev/deploy-ansible.yml \
-            -e "backend_image=${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ github.sha }}" \
-            -e "ghcr_token=${{ secrets.GITHUB_TOKEN }}" \
-            -e "ghcr_username=${{ github.actor }}" \
-            -v
+          host: 45.132.177.32
+          username: collab-user
+          key: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
+          script: |
+            # Для collab-go-auth используйте это имя:
+            sudo kubectl rollout restart deployment collab-go-auth -n collab
+            
+            # Для collab-user-service замените имя выше на:
+            # sudo kubectl rollout restart deployment collab-user-service -n collab

@@ -15,13 +15,15 @@ import (
 type Handler struct {
 	oauth       usecase.OAuthUseCase
 	frontendURL string // URL фронтенда для редиректов
+	isProd      bool   // Режим production для настроек cookies
 }
 
 // NewHandler - создает новый OAuth handler
-func NewHandler(oauth usecase.OAuthUseCase, frontendURL string) *Handler {
+func NewHandler(oauth usecase.OAuthUseCase, frontendURL string, isProd bool) *Handler {
 	return &Handler{
 		oauth:       oauth,
 		frontendURL: frontendURL,
+		isProd:      isProd,
 	}
 }
 
@@ -139,7 +141,7 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Редиректим на фронтенд с токенами
-	redirectWithTokens(w, r, finalFrontendURL, accessToken, refreshToken)
+	h.redirectWithTokens(w, r, finalFrontendURL, accessToken, refreshToken)
 }
 
 // GetProviders обрабатывает GET /api/v1/auth/oauth/providers
@@ -226,26 +228,31 @@ const (
 )
 
 // redirectWithTokens редиректит на фронтенд с токенами в cookies
-func redirectWithTokens(w http.ResponseWriter, r *http.Request, frontendURL, accessToken, refreshToken string) {
+func (h *Handler) redirectWithTokens(w http.ResponseWriter, r *http.Request, frontendURL, accessToken, refreshToken string) {
+	sameSite := http.SameSiteLaxMode
+	if h.isProd {
+		sameSite = http.SameSiteNoneMode
+	}
+
 	// Устанавливаем access_token в HttpOnly cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:     accessTokenCookieName,
 		Value:    accessToken,
 		Path:     "/",
-		HttpOnly: true,  // HttpOnly для безопасности
-		Secure:   false, // true для HTTPS в production
-		SameSite: http.SameSiteLaxMode,
+		HttpOnly: true, // HttpOnly для безопасности
+		Secure:   h.isProd,
+		SameSite: sameSite,
 		MaxAge:   accessTokenMaxAge,
 	})
 
-	// Устанавливаем refresh_token в cookie (НЕ HttpOnly, чтобы фронтенд мог читать)
+	// Устанавливаем refresh_token в cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:     refreshTokenCookieName,
 		Value:    refreshToken,
 		Path:     "/",
-		HttpOnly: false, // НЕ HttpOnly, чтобы фронтенд мог читать для refresh
-		Secure:   false, // true для HTTPS в production
-		SameSite: http.SameSiteLaxMode,
+		HttpOnly: true, // Сделаем HttpOnly для безопасности
+		Secure:   h.isProd,
+		SameSite: sameSite,
 		MaxAge:   refreshTokenMaxAge,
 	})
 

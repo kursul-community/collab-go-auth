@@ -36,7 +36,7 @@ services:
       - collab-network
 
   app:
-    image: ${REGISTRY}/${IMAGE_NAME}:${BACKEND_IMAGE_TAG}
+    image: ${REGISTRY}/${IMAGE_NAME}:latest
     container_name: go-auth
     environment:
       PG_USER: ${PG_USER}
