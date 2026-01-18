@@ -272,6 +272,7 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 		logger.Printf("OAuth routes registered")
 	}
 
+	// Swagger UI (использует CDN)
 	mainMux.HandleFunc("/api/v1/swagger", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write([]byte(`<!DOCTYPE html>
@@ -287,16 +288,13 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 			window.onload = () => {
 				SwaggerUIBundle({
 					url: '/api/v1/swagger/spec',
-					dom_id: '#swagger-ui',
-					presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
-					layout: "StandaloneLayout"
+					dom_id: '#swagger-ui'
 				});
 			};
 		</script>
 	</body>
 	</html>`))
 	})
-
 	// Swagger JSON spec
 	mainMux.HandleFunc("/api/v1/swagger/spec", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
