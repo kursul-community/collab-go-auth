@@ -12,7 +12,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/go-auth
+  IMAGE_NAME: ${{ github.repository }}/go-auth 
 
 jobs:
   build:
