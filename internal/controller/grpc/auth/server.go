@@ -70,7 +70,7 @@ func (s *AuthServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Login
 	accessToken, refreshToken, err := s.auth.Login(req.Email, req.Password)
 	if err != nil {
 		if errors.Is(err, usecase.ErrInvalidCredentials) {
-			return nil, status.Error(codes.Unauthenticated, "бля севастьян отдушии вообще!!)) Invalid Credentials")
+			return nil, status.Error(codes.Unauthenticated, "Invalid Credentials")
 		}
 
 		// Проверяем, является ли ошибка LoginError с userID и requestID
