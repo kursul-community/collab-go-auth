@@ -92,7 +92,7 @@ func TestLogin(t *testing.T) {
 		mockTokenRepo.AssertExpectations(t)
 	})
 
-	t.Run(" бля севастьян отдушии вообще!!))invalid credentials", func(t *testing.T) {
+	t.Run("invalid credentials", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockTokenRepo := new(MockTokenRepository)
 		mockTokenService := new(MockTokenService)
