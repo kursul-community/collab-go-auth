@@ -435,21 +435,7 @@ func cookieMiddleware(cfg *config.Config, next http.Handler) http.Handler {
 					})
 				}
 
-				// Устанавливаем refresh_token в cookie (только для login)
-				if isLoginPath {
-					refreshToken := getStringField(response, "refreshToken", "refresh_token")
-					if refreshToken != "" {
-						http.SetCookie(w, &http.Cookie{
-							Name:     RefreshTokenCookieName,
-							Value:    refreshToken,
-							Path:     "/",
-							HttpOnly: true, // Безопаснее сделать HttpOnly
-							Secure:   secure,
-							SameSite: sameSite,
-							MaxAge:   RefreshTokenMaxAge,
-						})
-					}
-				}
+				// refresh_token не устанавливаем в cookie — он должен возвращаться в body
 			}
 		}
 
