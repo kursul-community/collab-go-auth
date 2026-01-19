@@ -18,9 +18,9 @@ func (m *MockAuth) Login(email string, password string) (string, string, error) 
 	return args.String(0), args.String(1), args.Error(2)
 }
 
-func (m *MockAuth) RefreshToken(token string) (string, error) {
+func (m *MockAuth) RefreshToken(token string) (string, string, error) {
 	args := m.Called(token)
-	return args.String(0), args.Error(1)
+	return args.String(0), args.String(1), args.Error(2)
 }
 
 func (m *MockAuth) ValidateToken(token string) (bool, error) {

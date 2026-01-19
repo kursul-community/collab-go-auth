@@ -166,13 +166,25 @@ func TestRefreshToken(t *testing.T) {
 		mockTokenService.On("ValidateToken", refreshToken).Return(true, nil)
 		mockTokenService.On("GetUserIDFromToken", refreshToken).Return(userID, nil)
 		mockTokenRepo.On("ValidateRefreshToken", mock.Anything, userID, refreshToken).Return(true, nil)
-		mockTokenService.On("RefreshAccessToken", refreshToken).Return(newAccessToken, nil)
+		
+		mockUser := &entity.User{ID: userID}
+		mockUserRepo.On("GetUserById", mock.Anything, userID).Return(mockUser, nil)
+		
+		newAccessToken := "new-access-token"
+		newRefreshToken := "new-refresh-token"
+		
+		mockTokenService.On("GenerateAccessToken", mockUser).Return(newAccessToken, nil)
+		mockTokenService.On("GenerateRefreshToken", mockUser).Return(newRefreshToken, nil)
+		
 		mockTokenRepo.On("StoreAccessToken", mock.Anything, userID, newAccessToken, testAccessTTL).Return(nil)
+		mockTokenRepo.On("StoreRefreshToken", mock.Anything, userID, newRefreshToken, testRefreshTTL).Return(nil)
+		mockTokenRepo.On("RevokeRefreshToken", mock.Anything, userID, refreshToken).Return(nil)
 
 		// Тестируем
-		token, err := authUseCase.RefreshToken(refreshToken)
+		accessToken, refreshTokenRes, err := authUseCase.RefreshToken(refreshToken)
 		require.NoError(t, err)
-		require.Equal(t, newAccessToken, token)
+		require.Equal(t, newAccessToken, accessToken)
+		require.Equal(t, newRefreshToken, refreshTokenRes)
 
 		// Проверяем вызовы
 		mockTokenRepo.AssertExpectations(t)
@@ -191,9 +203,10 @@ func TestRefreshToken(t *testing.T) {
 
 		mockTokenService.On("ValidateToken", refreshToken).Return(false, errors.New("invalid token"))
 
-		token, err := authUseCase.RefreshToken(refreshToken)
+		token, refreshTokenRes, err := authUseCase.RefreshToken(refreshToken)
 		require.Error(t, err)
 		require.Empty(t, token)
+		require.Empty(t, refreshTokenRes)
 		require.ErrorIs(t, err, ErrInvalidRefreshToken)
 
 		mockTokenService.AssertExpectations(t)
@@ -214,9 +227,10 @@ func TestRefreshToken(t *testing.T) {
 		mockTokenService.On("GetUserIDFromToken", refreshToken).Return(userID, nil)
 		mockTokenRepo.On("ValidateRefreshToken", mock.Anything, userID, refreshToken).Return(false, nil)
 
-		token, err := authUseCase.RefreshToken(refreshToken)
+		token, refreshTokenRes, err := authUseCase.RefreshToken(refreshToken)
 		require.Error(t, err)
 		require.Empty(t, token)
+		require.Empty(t, refreshTokenRes)
 		require.ErrorIs(t, err, ErrRefreshTokenNotFound)
 
 		mockTokenRepo.AssertExpectations(t)

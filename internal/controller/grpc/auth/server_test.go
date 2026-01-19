@@ -90,11 +90,12 @@ func TestRefreshToken(t *testing.T) {
 		RefreshToken: "refreshToken12345",
 	}
 
-	mockAuth.On("RefreshToken", req.RefreshToken).Return("access_token", nil)
+	mockAuth.On("RefreshToken", req.RefreshToken).Return("access_token", "new_refresh_token", nil)
 
 	res, err := server.RefreshToken(ctx, req)
 	require.NoError(t, err)
 	assert.Equal(t, "access_token", res.AccessToken)
+	assert.Equal(t, "new_refresh_token", res.RefreshToken)
 
 	mockAuth.AssertExpectations(t)
 }

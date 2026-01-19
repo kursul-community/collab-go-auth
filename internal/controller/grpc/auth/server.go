@@ -141,11 +141,17 @@ func (s *AuthServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Login
 
 // RefreshToken - обновление токена
 func (s *AuthServer) RefreshToken(ctx context.Context, req *pb.RefreshTokenRequest) (*pb.RefreshTokenResponse, error) {
-	accessToken, err := s.auth.RefreshToken(req.RefreshToken)
+	accessToken, refreshToken, err := s.auth.RefreshToken(req.RefreshToken)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, usecase.ErrInvalidRefreshToken) || errors.Is(err, usecase.ErrRefreshTokenNotFound) {
+			return nil, status.Error(codes.Unauthenticated, err.Error())
+		}
+		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &pb.RefreshTokenResponse{AccessToken: accessToken}, nil
+	return &pb.RefreshTokenResponse{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	}, nil
 }
 
 // ValidateToken - проверка токена

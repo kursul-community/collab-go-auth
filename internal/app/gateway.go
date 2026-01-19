@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -377,21 +376,6 @@ func cookieMiddleware(cfg *config.Config, next http.Handler) http.Handler {
 			return
 		}
 
-		var refreshTokenFromRequest string
-		if isRefreshPath {
-			bodyBytes, err := io.ReadAll(r.Body)
-			if err == nil {
-				r.Body.Close()
-				r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-				if len(bodyBytes) > 0 {
-					var payload map[string]interface{}
-					if err := json.Unmarshal(bodyBytes, &payload); err == nil {
-						refreshTokenFromRequest = getStringField(payload, "refreshToken", "refresh_token")
-					}
-				}
-			}
-		}
-
 		// Создаем буферизированный ResponseWriter
 		bw := &bufferedResponseWriter{
 			ResponseWriter: w,
@@ -451,23 +435,7 @@ func cookieMiddleware(cfg *config.Config, next http.Handler) http.Handler {
 					})
 				}
 
-				if isRefreshPath {
-					refreshToken := getStringField(response, "refreshToken", "refresh_token")
-					if refreshToken == "" {
-						refreshToken = refreshTokenFromRequest
-					}
-					if refreshToken != "" {
-						http.SetCookie(w, &http.Cookie{
-							Name:     RefreshTokenCookieName,
-							Value:    refreshToken,
-							Path:     "/",
-							HttpOnly: false,
-							Secure:   secure,
-							SameSite: sameSite,
-							MaxAge:   RefreshTokenMaxAge,
-						})
-					}
-				}
+				// refresh_token не устанавливаем в cookie — он должен возвращаться в body
 			}
 		}
 
