@@ -298,10 +298,27 @@ func NewConfig() (*Config, error) {
 		return nil, err
 	}
 
+	// Подстраиваем адрес user-service под Kubernetes, если env не задан.
+	cfg.applyServiceDefaults()
+
 	// Загружаем OAuth credentials из переменных окружения
 	cfg.loadOAuthCredentials()
 
 	return cfg, nil
+}
+
+// applyServiceDefaults - подбирает адреса сервисов по окружению
+func (c *Config) applyServiceDefaults() {
+	if os.Getenv("USER_SERVICE_ADDR") != "" {
+		return
+	}
+
+	// Если работаем в k8s и адрес не переопределен, используем DNS сервиса.
+	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
+		if c.Services.UserService == "" || c.Services.UserService == "localhost:60052" {
+			c.Services.UserService = "collab-user-service:60052"
+		}
+	}
 }
 
 // loadOAuthCredentials - загрузка OAuth credentials из переменных окружения
