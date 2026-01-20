@@ -46,6 +46,12 @@ func (c *client) ProfileExists(ctx context.Context, userID string) (bool, error)
 		return false, nil
 	}
 
-	// Если сервис вернул объект профиля, считаем, что он существует.
-	return true, nil
+	// Проверяем, заполнено ли хотя бы одно поле профиля.
+	// Если все ключевые поля пустые, считаем что профиль НЕ создан (пользователь не вызвал CreateProfile).
+	isProfileFilled := profile.Username != "" || 
+		profile.AboutInfo != "" || 
+		profile.GitUrl != "" || 
+		profile.Position != ""
+	
+	return isProfileFilled, nil
 }
