@@ -523,14 +523,13 @@ func (uc *auth) Login(email string, password string) (string, string, error) {
 	// Проверяем, заполнен ли профиль
 	log.Printf("Checking profile existence for user %s", curUser.ID)
 	exists, err := uc.userClient.ProfileExists(ctx, curUser.ID)
-	if err != nil || !exists {
-		if err != nil {
-			log.Printf("Failed to check profile existence for user %s: %v", curUser.ID, err)
-		} else {
-			log.Printf("Profile not filled for user %s, returning 209 via LoginError", curUser.ID)
-		}
-		// Если профиль не заполнен или произошла ошибка проверки, 
-		// возвращаем токены но с ошибкой ErrProfileNotFilled (код 209)
+	if err != nil {
+		log.Printf("Failed to check profile existence for user %s: %v", curUser.ID, err)
+		return "", "", fmt.Errorf("failed to check profile existence: %w", err)
+	}
+	if !exists {
+		log.Printf("Profile not found for user %s, returning 209 via LoginError", curUser.ID)
+		// Если профиль не существует, возвращаем 209
 		return accessToken, refreshToken, &LoginError{
 			Err:    ErrProfileNotFilled,
 			UserID: curUser.ID,
