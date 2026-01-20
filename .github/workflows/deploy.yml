@@ -1,10 +1,9 @@
 name: Build and Deploy (K8s)
 
 on:
-  push:
+  pull_request:
     branches:
       - main
-      - dev
 
 env:
   REGISTRY: ghcr.io
@@ -64,6 +63,3 @@ jobs:
           script: |
             # Для collab-go-auth используйте это имя:
             sudo kubectl rollout restart deployment collab-go-auth -n collab
-            
-            # Для collab-user-service замените имя выше на:
-            # sudo kubectl rollout restart deployment collab-user-service -n collab

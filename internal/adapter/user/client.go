@@ -46,11 +46,6 @@ func (c *client) ProfileExists(ctx context.Context, userID string) (bool, error)
 		return false, nil
 	}
 
-	// Проверяем, заполнено ли хотя бы одно поле.
-	// Если все поля пустые, считаем, что профиль не заполнен (209).
-	if profile.Username == "" && profile.AboutInfo == "" && profile.GitUrl == "" && profile.Position == "" {
-		return false, nil
-	}
-
+	// Профиль существует, если user-service вернул запись, независимо от заполненности.
 	return true, nil
 }
