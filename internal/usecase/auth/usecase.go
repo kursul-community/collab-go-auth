@@ -67,7 +67,7 @@ type AuthUseCase interface {
 	// Login - авторизация пользователя
 	Login(email string, password string) (accessToken, refreshToken string, err error)
 	// RefreshToken - обновление токена
-	RefreshToken(refreshToken string) (accessToken string, err error)
+	RefreshToken(refreshToken string) (accessToken, newRefreshToken string, err error)
 	// ValidateToken - проверка токена
 	ValidateToken(accessToken string) (valid bool, err error)
 	// ResendVerificationEmail - повторная отправка кода верификации email
@@ -521,7 +521,7 @@ func (uc *auth) Login(email string, password string) (string, string, error) {
 	}
 
 	// Проверяем, заполнен ли профиль
-	log.Printf("Checking profile existence for user %s at %s", curUser.ID, uc.userClient)
+	log.Printf("Checking profile existence for user %s", curUser.ID)
 	exists, err := uc.userClient.ProfileExists(ctx, curUser.ID)
 	if err != nil || !exists {
 		if err != nil {
@@ -530,7 +530,7 @@ func (uc *auth) Login(email string, password string) (string, string, error) {
 			log.Printf("Profile not filled for user %s, returning 209 via LoginError", curUser.ID)
 		}
 		// Если профиль не заполнен или произошла ошибка проверки, 
-		// возвращаем токены но с ошибкой ErrProfileNotFilled
+		// возвращаем токены но с ошибкой ErrProfileNotFilled (код 209)
 		return accessToken, refreshToken, &LoginError{
 			Err:    ErrProfileNotFilled,
 			UserID: curUser.ID,
@@ -541,43 +541,64 @@ func (uc *auth) Login(email string, password string) (string, string, error) {
 }
 
 // RefreshToken - обновление токена
-func (uc *auth) RefreshToken(refreshToken string) (string, error) {
+func (uc *auth) RefreshToken(refreshToken string) (string, string, error) {
 	ctx := context.Background()
 
 	// Проверяем валидность JWT токена (подпись и срок действия)
 	isValid, err := uc.tokenService.ValidateToken(refreshToken)
 	if !isValid || err != nil {
-		return "", ErrInvalidRefreshToken
+		return "", "", ErrInvalidRefreshToken
 	}
 
 	// Получаем userID из токена
 	userID, err := uc.tokenService.GetUserIDFromToken(refreshToken)
 	if err != nil {
-		return "", ErrInvalidRefreshToken
+		return "", "", ErrInvalidRefreshToken
 	}
 
 	// Проверяем, что refresh токен существует в Redis (не был отозван)
 	exists, err := uc.tokenRepo.ValidateRefreshToken(ctx, userID, refreshToken)
 	if err != nil {
-		return "", fmt.Errorf("failed to validate refresh token: %w", err)
+		return "", "", fmt.Errorf("failed to validate refresh token: %w", err)
 	}
 	if !exists {
-		return "", ErrRefreshTokenNotFound
+		return "", "", ErrRefreshTokenNotFound
+	}
+
+	// Получаем данные пользователя для генерации новых токенов
+	curUser, err := uc.userRepo.GetUserById(ctx, userID)
+	if err != nil || curUser == nil {
+		return "", "", ErrUserNotFound
 	}
 
 	// Генерация нового access токена
-	newAccessToken, err := uc.tokenService.RefreshAccessToken(refreshToken)
+	newAccessToken, err := uc.tokenService.GenerateAccessToken(curUser)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate access token: %w", err)
+		return "", "", fmt.Errorf("failed to generate access token: %w", err)
+	}
+
+	// Генерируем новый refresh токен
+	newRefreshToken, err := uc.tokenService.GenerateRefreshToken(curUser)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to generate refresh token: %w", err)
 	}
 
 	// Сохраняем новый access токен в Redis
 	err = uc.tokenRepo.StoreAccessToken(ctx, userID, newAccessToken, uc.accessTTL)
 	if err != nil {
-		return "", fmt.Errorf("failed to store new access token: %w", err)
+		return "", "", fmt.Errorf("failed to store new access token: %w", err)
 	}
 
-	return newAccessToken, nil
+	// Сохраняем новый refresh токен в Redis
+	err = uc.tokenRepo.StoreRefreshToken(ctx, userID, newRefreshToken, uc.refreshTTL)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to store new refresh token: %w", err)
+	}
+
+	// Отзываем старый refresh токен
+	_ = uc.tokenRepo.RevokeRefreshToken(ctx, userID, refreshToken)
+
+	return newAccessToken, newRefreshToken, nil
 }
 
 // ValidateToken - проверка access токена
