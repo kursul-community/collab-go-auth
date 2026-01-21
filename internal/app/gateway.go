@@ -272,35 +272,6 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 		logger.Printf("OAuth routes registered")
 	}
 
-	// Swagger UI (использует CDN)
-	mainMux.HandleFunc("/api/v1/swagger", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write([]byte(`<!DOCTYPE html>
-	<html>
-	<head>
-		<title>Collab API - Swagger UI</title>
-		<link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css" />
-	</head>
-	<body>
-		<div id="swagger-ui"></div>
-		<script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js"></script>
-		<script>
-			window.onload = () => {
-				SwaggerUIBundle({
-					url: '/api/v1/swagger/spec',
-					dom_id: '#swagger-ui'
-				});
-			};
-		</script>
-	</body>
-	</html>`))
-	})
-	// Swagger JSON spec
-	mainMux.HandleFunc("/api/v1/swagger/spec", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		http.ServeFile(w, r, "./swagger-combined.json")
-	})
-
 	// gRPC Gateway обрабатывает остальные запросы
 	mainMux.Handle("/", grpcMux)
 
@@ -339,7 +310,7 @@ func corsMiddleware(cfg *config.Config, next http.Handler) http.Handler {
 		}
 
 		if isAllowed {
-			w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 		} else if len(allowedOrigins) > 0 && allowedOrigins[0] == "*" {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -362,9 +333,6 @@ func corsMiddleware(cfg *config.Config, next http.Handler) http.Handler {
 // cookieMiddleware - устанавливает токены в cookies для /auth/login и /auth/refresh
 func cookieMiddleware(cfg *config.Config, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Определяем, безопасное ли соединение (TLS или HTTPS за прокси)
-		isHTTPS := r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
-
 		// Проверяем, нужно ли обрабатывать этот путь
 		path := r.URL.Path
 		isLoginPath := strings.HasSuffix(path, "/auth/login")
@@ -407,19 +375,10 @@ func cookieMiddleware(cfg *config.Config, next http.Handler) http.Handler {
 			var response map[string]interface{}
 			if err := json.Unmarshal(bw.buf.Bytes(), &response); err == nil {
 				// Определяем настройки cookies в зависимости от окружения
-				isDev := cfg != nil && cfg.App.IsDevelopment()
+				isProd := cfg.App.Env == "production"
 				sameSite := http.SameSiteLaxMode
-				secure := isHTTPS
-				if isDev {
-					// В dev хотим SameSite=None, но браузер требует Secure.
-					// Если HTTPS нет, оставляем Lax, иначе куки будут отброшены.
-					if isHTTPS {
-						sameSite = http.SameSiteNoneMode
-						secure = true
-					} else {
-						sameSite = http.SameSiteLaxMode
-						secure = false
-					}
+				if isProd {
+					sameSite = http.SameSiteNoneMode // Для кросс-доменных запросов в прод
 				}
 
 				accessToken := getStringField(response, "accessToken", "access_token")
@@ -429,13 +388,27 @@ func cookieMiddleware(cfg *config.Config, next http.Handler) http.Handler {
 						Value:    accessToken,
 						Path:     "/",
 						HttpOnly: true,
-						Secure:   secure,
+						Secure:   isProd, // true только для HTTPS
 						SameSite: sameSite,
 						MaxAge:   AccessTokenMaxAge,
 					})
 				}
 
-				// refresh_token не устанавливаем в cookie — он должен возвращаться в body
+				// Устанавливаем refresh_token в cookie (только для login)
+				if isLoginPath {
+					refreshToken := getStringField(response, "refreshToken", "refresh_token")
+					if refreshToken != "" {
+						http.SetCookie(w, &http.Cookie{
+							Name:     RefreshTokenCookieName,
+							Value:    refreshToken,
+							Path:     "/",
+							HttpOnly: true, // Безопаснее сделать HttpOnly
+							Secure:   isProd,
+							SameSite: sameSite,
+							MaxAge:   RefreshTokenMaxAge,
+						})
+					}
+				}
 			}
 		}
 
