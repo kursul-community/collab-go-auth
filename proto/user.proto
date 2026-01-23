@@ -59,8 +59,9 @@ message UserProfile {
   string about_info = 3;
   string git_url = 4;
   string position = 5;
-  string created_at = 6;
-  string updated_at = 7;
+  string avatar_url = 6;
+  string created_at = 7;
+  string updated_at = 8;
 }
 
 message UpdateProfileRequest {

@@ -89,8 +89,9 @@ type UserProfile struct {
 	AboutInfo     string                 `protobuf:"bytes,3,opt,name=about_info,json=aboutInfo,proto3" json:"about_info,omitempty"`
 	GitUrl        string                 `protobuf:"bytes,4,opt,name=git_url,json=gitUrl,proto3" json:"git_url,omitempty"`
 	Position      string                 `protobuf:"bytes,5,opt,name=position,proto3" json:"position,omitempty"`
-	CreatedAt     string                 `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt     string                 `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	AvatarUrl     string                 `protobuf:"bytes,6,opt,name=avatar_url,json=avatarUrl,proto3" json:"avatar_url,omitempty"`
+	CreatedAt     string                 `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     string                 `protobuf:"bytes,8,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -156,6 +157,13 @@ func (x *UserProfile) GetGitUrl() string {
 func (x *UserProfile) GetPosition() string {
 	if x != nil {
 		return x.Position
+	}
+	return ""
+}
+
+func (x *UserProfile) GetAvatarUrl() string {
+	if x != nil {
+		return x.AvatarUrl
 	}
 	return ""
 }
@@ -595,7 +603,7 @@ const file_user_proto_rawDesc = "" +
 	"\bPosition\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1a\n" +
-	"\bcategory\x18\x03 \x01(\tR\bcategory\"\xd4\x01\n" +
+	"\bcategory\x18\x03 \x01(\tR\bcategory\"\xf3\x01\n" +
 	"\vUserProfile\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12\x1d\n" +
@@ -604,9 +612,11 @@ const file_user_proto_rawDesc = "" +
 	"\agit_url\x18\x04 \x01(\tR\x06gitUrl\x12\x1a\n" +
 	"\bposition\x18\x05 \x01(\tR\bposition\x12\x1d\n" +
 	"\n" +
-	"created_at\x18\x06 \x01(\tR\tcreatedAt\x12\x1d\n" +
+	"avatar_url\x18\x06 \x01(\tR\tavatarUrl\x12\x1d\n" +
 	"\n" +
-	"updated_at\x18\a \x01(\tR\tupdatedAt\"\x9f\x01\n" +
+	"created_at\x18\a \x01(\tR\tcreatedAt\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\b \x01(\tR\tupdatedAt\"\x9f\x01\n" +
 	"\x14UpdateProfileRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12\x1d\n" +
