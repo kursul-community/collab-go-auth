@@ -376,7 +376,7 @@ func (x *GetMyProfileResponse) GetProfile() *UserProfile {
 
 type GetProfileRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -411,7 +411,51 @@ func (*GetProfileRequest) Descriptor() ([]byte, []int) {
 	return file_user_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *GetProfileRequest) GetUserId() string {
+func (x *GetProfileRequest) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+type GetProfileByIDRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetProfileByIDRequest) Reset() {
+	*x = GetProfileByIDRequest{}
+	mi := &file_user_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetProfileByIDRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetProfileByIDRequest) ProtoMessage() {}
+
+func (x *GetProfileByIDRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_user_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetProfileByIDRequest.ProtoReflect.Descriptor instead.
+func (*GetProfileByIDRequest) Descriptor() ([]byte, []int) {
+	return file_user_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *GetProfileByIDRequest) GetUserId() string {
 	if x != nil {
 		return x.UserId
 	}
@@ -427,7 +471,7 @@ type GetProfileResponse struct {
 
 func (x *GetProfileResponse) Reset() {
 	*x = GetProfileResponse{}
-	mi := &file_user_proto_msgTypes[7]
+	mi := &file_user_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -439,7 +483,7 @@ func (x *GetProfileResponse) String() string {
 func (*GetProfileResponse) ProtoMessage() {}
 
 func (x *GetProfileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_user_proto_msgTypes[7]
+	mi := &file_user_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -452,7 +496,7 @@ func (x *GetProfileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetProfileResponse.ProtoReflect.Descriptor instead.
 func (*GetProfileResponse) Descriptor() ([]byte, []int) {
-	return file_user_proto_rawDescGZIP(), []int{7}
+	return file_user_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GetProfileResponse) GetProfile() *UserProfile {
@@ -470,7 +514,7 @@ type GetPositionsRequest struct {
 
 func (x *GetPositionsRequest) Reset() {
 	*x = GetPositionsRequest{}
-	mi := &file_user_proto_msgTypes[8]
+	mi := &file_user_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -482,7 +526,7 @@ func (x *GetPositionsRequest) String() string {
 func (*GetPositionsRequest) ProtoMessage() {}
 
 func (x *GetPositionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_user_proto_msgTypes[8]
+	mi := &file_user_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -495,7 +539,7 @@ func (x *GetPositionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPositionsRequest.ProtoReflect.Descriptor instead.
 func (*GetPositionsRequest) Descriptor() ([]byte, []int) {
-	return file_user_proto_rawDescGZIP(), []int{8}
+	return file_user_proto_rawDescGZIP(), []int{9}
 }
 
 type GetPositionsResponse struct {
@@ -507,7 +551,7 @@ type GetPositionsResponse struct {
 
 func (x *GetPositionsResponse) Reset() {
 	*x = GetPositionsResponse{}
-	mi := &file_user_proto_msgTypes[9]
+	mi := &file_user_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -519,7 +563,7 @@ func (x *GetPositionsResponse) String() string {
 func (*GetPositionsResponse) ProtoMessage() {}
 
 func (x *GetPositionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_user_proto_msgTypes[9]
+	mi := &file_user_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -532,7 +576,7 @@ func (x *GetPositionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPositionsResponse.ProtoReflect.Descriptor instead.
 func (*GetPositionsResponse) Descriptor() ([]byte, []int) {
-	return file_user_proto_rawDescGZIP(), []int{9}
+	return file_user_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GetPositionsResponse) GetPositions() []string {
@@ -574,19 +618,22 @@ const file_user_proto_rawDesc = "" +
 	"\x06status\x18\x01 \x01(\tR\x06status\"\x15\n" +
 	"\x13GetMyProfileRequest\"C\n" +
 	"\x14GetMyProfileResponse\x12+\n" +
-	"\aprofile\x18\x01 \x01(\v2\x11.user.UserProfileR\aprofile\",\n" +
-	"\x11GetProfileRequest\x12\x17\n" +
+	"\aprofile\x18\x01 \x01(\v2\x11.user.UserProfileR\aprofile\"/\n" +
+	"\x11GetProfileRequest\x12\x1a\n" +
+	"\busername\x18\x01 \x01(\tR\busername\"0\n" +
+	"\x15GetProfileByIDRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\"A\n" +
 	"\x12GetProfileResponse\x12+\n" +
 	"\aprofile\x18\x01 \x01(\v2\x11.user.UserProfileR\aprofile\"\x15\n" +
 	"\x13GetPositionsRequest\"4\n" +
 	"\x14GetPositionsResponse\x12\x1c\n" +
-	"\tpositions\x18\x01 \x03(\tR\tpositions2\xaf\x03\n" +
+	"\tpositions\x18\x01 \x03(\tR\tpositions2\xc4\x04\n" +
 	"\vUserService\x12p\n" +
 	"\rCreateProfile\x12\x1a.user.UpdateProfileRequest\x1a\x1b.user.UpdateProfileResponse\"&\x82\xd3\xe4\x93\x02 :\x01*\"\x1b/api/v1/user/create-profile\x12^\n" +
-	"\fGetMyProfile\x12\x19.user.GetMyProfileRequest\x1a\x1a.user.GetMyProfileResponse\"\x17\x82\xd3\xe4\x93\x02\x11\x12\x0f/api/v1/user/me\x12g\n" +
+	"\fGetMyProfile\x12\x19.user.GetMyProfileRequest\x1a\x1a.user.GetMyProfileResponse\"\x17\x82\xd3\xe4\x93\x02\x11\x12\x0f/api/v1/user/me\x12\x84\x01\n" +
 	"\n" +
-	"GetProfile\x12\x17.user.GetProfileRequest\x1a\x18.user.GetProfileResponse\"&\x82\xd3\xe4\x93\x02 \x12\x1e/api/v1/user/profile/{user_id}\x12e\n" +
+	"GetProfile\x12\x17.user.GetProfileRequest\x1a\x18.user.GetProfileResponse\"C\x82\xd3\xe4\x93\x02=Z!\x12\x1f/api/v1/user/profile/{username}\x12\x18/user/profile/{username}\x12u\n" +
+	"\x0eGetProfileByID\x12\x1b.user.GetProfileByIDRequest\x1a\x18.user.GetProfileResponse\",\x82\xd3\xe4\x93\x02&\x12$/api/v1/user/profile-by-id/{user_id}\x12e\n" +
 	"\fGetPositions\x12\x19.user.GetPositionsRequest\x1a\x1a.user.GetPositionsResponse\"\x1e\x82\xd3\xe4\x93\x02\x18\x12\x16/api/v1/user/positionsB\x1eZ\x1ccollab-user-service/gen/userb\x06proto3"
 
 var (
@@ -601,7 +648,7 @@ func file_user_proto_rawDescGZIP() []byte {
 	return file_user_proto_rawDescData
 }
 
-var file_user_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_user_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_user_proto_goTypes = []any{
 	(*Position)(nil),              // 0: user.Position
 	(*UserProfile)(nil),           // 1: user.UserProfile
@@ -610,26 +657,29 @@ var file_user_proto_goTypes = []any{
 	(*GetMyProfileRequest)(nil),   // 4: user.GetMyProfileRequest
 	(*GetMyProfileResponse)(nil),  // 5: user.GetMyProfileResponse
 	(*GetProfileRequest)(nil),     // 6: user.GetProfileRequest
-	(*GetProfileResponse)(nil),    // 7: user.GetProfileResponse
-	(*GetPositionsRequest)(nil),   // 8: user.GetPositionsRequest
-	(*GetPositionsResponse)(nil),  // 9: user.GetPositionsResponse
+	(*GetProfileByIDRequest)(nil), // 7: user.GetProfileByIDRequest
+	(*GetProfileResponse)(nil),    // 8: user.GetProfileResponse
+	(*GetPositionsRequest)(nil),   // 9: user.GetPositionsRequest
+	(*GetPositionsResponse)(nil),  // 10: user.GetPositionsResponse
 }
 var file_user_proto_depIdxs = []int32{
-	1, // 0: user.GetMyProfileResponse.profile:type_name -> user.UserProfile
-	1, // 1: user.GetProfileResponse.profile:type_name -> user.UserProfile
-	2, // 2: user.UserService.CreateProfile:input_type -> user.UpdateProfileRequest
-	4, // 3: user.UserService.GetMyProfile:input_type -> user.GetMyProfileRequest
-	6, // 4: user.UserService.GetProfile:input_type -> user.GetProfileRequest
-	8, // 5: user.UserService.GetPositions:input_type -> user.GetPositionsRequest
-	3, // 6: user.UserService.CreateProfile:output_type -> user.UpdateProfileResponse
-	5, // 7: user.UserService.GetMyProfile:output_type -> user.GetMyProfileResponse
-	7, // 8: user.UserService.GetProfile:output_type -> user.GetProfileResponse
-	9, // 9: user.UserService.GetPositions:output_type -> user.GetPositionsResponse
-	6, // [6:10] is the sub-list for method output_type
-	2, // [2:6] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	1,  // 0: user.GetMyProfileResponse.profile:type_name -> user.UserProfile
+	1,  // 1: user.GetProfileResponse.profile:type_name -> user.UserProfile
+	2,  // 2: user.UserService.CreateProfile:input_type -> user.UpdateProfileRequest
+	4,  // 3: user.UserService.GetMyProfile:input_type -> user.GetMyProfileRequest
+	6,  // 4: user.UserService.GetProfile:input_type -> user.GetProfileRequest
+	7,  // 5: user.UserService.GetProfileByID:input_type -> user.GetProfileByIDRequest
+	9,  // 6: user.UserService.GetPositions:input_type -> user.GetPositionsRequest
+	3,  // 7: user.UserService.CreateProfile:output_type -> user.UpdateProfileResponse
+	5,  // 8: user.UserService.GetMyProfile:output_type -> user.GetMyProfileResponse
+	8,  // 9: user.UserService.GetProfile:output_type -> user.GetProfileResponse
+	8,  // 10: user.UserService.GetProfileByID:output_type -> user.GetProfileResponse
+	10, // 11: user.UserService.GetPositions:output_type -> user.GetPositionsResponse
+	7,  // [7:12] is the sub-list for method output_type
+	2,  // [2:7] is the sub-list for method input_type
+	2,  // [2:2] is the sub-list for extension type_name
+	2,  // [2:2] is the sub-list for extension extendee
+	0,  // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_user_proto_init() }
@@ -643,7 +693,7 @@ func file_user_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_user_proto_rawDesc), len(file_user_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

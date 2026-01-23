@@ -32,7 +32,7 @@ func NewClient(addr string) (Client, error) {
 }
 
 func (c *client) ProfileExists(ctx context.Context, userID string) (bool, error) {
-	resp, err := c.userClient.GetProfile(ctx, &pb.GetProfileRequest{UserId: userID})
+	resp, err := c.userClient.GetProfileByID(ctx, &pb.GetProfileByIDRequest{UserId: userID})
 	if err != nil {
 		st, ok := status.FromError(err)
 		if ok && st.Code() == codes.NotFound {
