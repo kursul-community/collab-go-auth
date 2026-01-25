@@ -87,6 +87,31 @@
           }
         }
       },
+      "/auth/logout": {
+        "post": {
+          "tags": ["Auth"],
+          "summary": "Выход из системы",
+          "operationId": "logout",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/LogoutRequest" }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Выход выполнен",
+              "content": {
+                "application/json": {
+                  "schema": { "$ref": "#/components/schemas/LogoutResponse" }
+                }
+              }
+            }
+          }
+        }
+      },
       "/auth/validate": {
         "post": {
           "tags": ["Auth"],
@@ -357,8 +382,18 @@
         "RefreshTokenResponse": {
           "type": "object",
           "properties": {
-            "accessToken": { "type": "string" }
+            "accessToken": { "type": "string" },
+            "refreshToken": { "type": "string" }
           }
+        },
+        "LogoutRequest": {
+          "type": "object",
+          "properties": {
+            "refreshToken": { "type": "string" }
+          }
+        },
+        "LogoutResponse": {
+          "type": "object"
         },
         "ValidateTokenRequest": {
           "type": "object",

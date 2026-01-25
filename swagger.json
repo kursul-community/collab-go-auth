@@ -190,6 +190,55 @@
         }
       }
     },
+    "/auth/logout": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Выход из системы",
+        "description": "Отзывает refresh токен и активные access токены пользователя, очищает cookies `access_token` и `refresh_token`.",
+        "operationId": "logout",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogoutRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Успешный выход. Cookies сброшены.",
+            "headers": {
+              "Set-Cookie": {
+                "description": "Пустые cookies для `access_token` и `refresh_token` (Max-Age=0)",
+                "schema": {
+                  "type": "string",
+                  "example": "access_token=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogoutResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Невалидный или отозванный refresh токен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/validate": {
       "post": {
         "tags": ["Auth"],
@@ -707,8 +756,28 @@
             "type": "string",
             "description": "Новый JWT access токен. Также устанавливается в cookie `access_token` (HttpOnly, 30 минут)",
             "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "Обновленный refresh токен (устанавливается в cookie `refresh_token`, 30 дней)",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
           }
         }
+      },
+      "LogoutRequest": {
+        "type": "object",
+        "required": ["refreshToken"],
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "Refresh токен активной сессии (можно передать из cookie)",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          }
+        }
+      },
+      "LogoutResponse": {
+        "type": "object",
+        "description": "Пустой ответ при успешном выходе"
       },
       "ValidateTokenRequest": {
         "type": "object",

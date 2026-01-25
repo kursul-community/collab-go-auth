@@ -310,7 +310,7 @@ func corsMiddleware(cfg *config.Config, next http.Handler) http.Handler {
 		}
 
 		if isAllowed {
-		w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 		} else if len(allowedOrigins) > 0 && allowedOrigins[0] == "*" {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -330,15 +330,16 @@ func corsMiddleware(cfg *config.Config, next http.Handler) http.Handler {
 	})
 }
 
-// cookieMiddleware - устанавливает токены в cookies для /auth/login и /auth/refresh
+// cookieMiddleware - управляет cookies для /auth/login, /auth/refresh и /auth/logout
 func cookieMiddleware(cfg *config.Config, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Проверяем, нужно ли обрабатывать этот путь
 		path := r.URL.Path
 		isLoginPath := strings.HasSuffix(path, "/auth/login")
 		isRefreshPath := strings.HasSuffix(path, "/auth/refresh")
+		isLogoutPath := strings.HasSuffix(path, "/auth/logout")
 
-		if !isLoginPath && !isRefreshPath {
+		if !isLoginPath && !isRefreshPath && !isLogoutPath {
 			// Не наш путь, пропускаем
 			next.ServeHTTP(w, r)
 			return
@@ -372,42 +373,64 @@ func cookieMiddleware(cfg *config.Config, next http.Handler) http.Handler {
 				}
 			}
 
-			var response map[string]interface{}
-			if err := json.Unmarshal(bw.buf.Bytes(), &response); err == nil {
-				// Определяем настройки cookies в зависимости от окружения
-				isProd := cfg.App.Env == "production"
-				sameSite := http.SameSiteLaxMode
-				if isProd {
-					sameSite = http.SameSiteNoneMode // Для кросс-доменных запросов в прод
-				}
+			// Определяем настройки cookies в зависимости от окружения
+			isProd := cfg.App.Env == "production"
+			sameSite := http.SameSiteLaxMode
+			if isProd {
+				sameSite = http.SameSiteNoneMode // Для кросс-доменных запросов в прод
+			}
 
-				accessToken := getStringField(response, "accessToken", "access_token")
-				if accessToken != "" {
-					http.SetCookie(w, &http.Cookie{
-						Name:     AccessTokenCookieName,
-						Value:    accessToken,
-						Path:     "/",
-						HttpOnly: true,
-						Secure:   isProd, // true только для HTTPS
-						SameSite: sameSite,
-						MaxAge:   AccessTokenMaxAge,
-					})
-				}
-
-				// Устанавливаем refresh_token в cookie для login и refresh,
-				// чтобы клиент всегда получал актуальный токен после обновления
-				if isLoginPath || isRefreshPath {
-					refreshToken := getStringField(response, "refreshToken", "refresh_token")
-					if refreshToken != "" {
+			if isLogoutPath {
+				// Для logout очищаем cookies
+				http.SetCookie(w, &http.Cookie{
+					Name:     AccessTokenCookieName,
+					Value:    "",
+					Path:     "/",
+					HttpOnly: true,
+					Secure:   isProd,
+					SameSite: sameSite,
+					MaxAge:   0,
+				})
+				http.SetCookie(w, &http.Cookie{
+					Name:     RefreshTokenCookieName,
+					Value:    "",
+					Path:     "/",
+					HttpOnly: true,
+					Secure:   isProd,
+					SameSite: sameSite,
+					MaxAge:   0,
+				})
+			} else {
+				var response map[string]interface{}
+				if err := json.Unmarshal(bw.buf.Bytes(), &response); err == nil {
+					accessToken := getStringField(response, "accessToken", "access_token")
+					if accessToken != "" {
 						http.SetCookie(w, &http.Cookie{
-							Name:     RefreshTokenCookieName,
-							Value:    refreshToken,
+							Name:     AccessTokenCookieName,
+							Value:    accessToken,
 							Path:     "/",
-							HttpOnly: true, // Безопаснее сделать HttpOnly
-							Secure:   isProd,
+							HttpOnly: true,
+							Secure:   isProd, // true только для HTTPS
 							SameSite: sameSite,
-							MaxAge:   RefreshTokenMaxAge,
+							MaxAge:   AccessTokenMaxAge,
 						})
+					}
+
+					// Устанавливаем refresh_token в cookie для login и refresh,
+					// чтобы клиент всегда получал актуальный токен после обновления
+					if isLoginPath || isRefreshPath {
+						refreshToken := getStringField(response, "refreshToken", "refresh_token")
+						if refreshToken != "" {
+							http.SetCookie(w, &http.Cookie{
+								Name:     RefreshTokenCookieName,
+								Value:    refreshToken,
+								Path:     "/",
+								HttpOnly: true, // Безопаснее сделать HttpOnly
+								Secure:   isProd,
+								SameSite: sameSite,
+								MaxAge:   RefreshTokenMaxAge,
+							})
+						}
 					}
 				}
 			}
