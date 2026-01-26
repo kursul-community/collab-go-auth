@@ -247,12 +247,10 @@ func (h *Handler) redirectWithTokens(w http.ResponseWriter, r *http.Request, fro
 
 	// Устанавливаем refresh_token в cookie
 	http.SetCookie(w, &http.Cookie{
-		Name:  refreshTokenCookieName,
-		Value: refreshToken,
-		Path:  "/",
-		// Делаем доступным из JS, как в обычном /auth/login,
-		// чтобы фронт мог положить токен в стор
-		HttpOnly: false,
+		Name:     refreshTokenCookieName,
+		Value:    refreshToken,
+		Path:     "/",
+		HttpOnly: true, // Сделаем HttpOnly для безопасности
 		Secure:   h.isProd,
 		SameSite: sameSite,
 		MaxAge:   refreshTokenMaxAge,
