@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/url"
 	"time"
 
 	"github.com/google/uuid"
@@ -205,7 +206,30 @@ func (uc *oauthUseCase) HandleCallback(providerName, code, state string) (string
 
 	log.Printf("OAuth: successfully authenticated user %s via %s", user.ID, providerName)
 
-	return accessToken, refreshToken, stateData.FrontendURL, nil
+	// Определяем, куда редиректить пользователя: на главную или на создание профиля
+	redirectURL := stateData.FrontendURL
+	if uc.userClient != nil {
+		exists, err := uc.userClient.ProfileExists(ctx, user.ID)
+		if err != nil {
+			log.Printf("OAuth: failed to check profile existence for user %s: %v", user.ID, err)
+		} else {
+			targetPath := "/"
+			if !exists {
+				targetPath = "/auth/create-profile"
+			}
+
+			if parsed, err := url.Parse(stateData.FrontendURL); err == nil {
+				parsed.Path = targetPath
+				parsed.RawQuery = ""
+				parsed.Fragment = ""
+				redirectURL = parsed.String()
+			} else {
+				log.Printf("OAuth: failed to parse frontend URL '%s': %v", stateData.FrontendURL, err)
+			}
+		}
+	}
+
+	return accessToken, refreshToken, redirectURL, nil
 }
 
 // findOrCreateOAuthUser - ищет существующего пользователя или создает нового
@@ -277,4 +301,3 @@ func (uc *oauthUseCase) GetProviders(frontendURL string) ([]ProviderResponse, er
 
 	return response, nil
 }
-
