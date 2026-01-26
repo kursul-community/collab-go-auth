@@ -44,7 +44,7 @@ func (h *Handler) GetAuthURL(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("OAuth: GetAuthURL request for provider: %s", provider)
 
-	// Пытаемся получить frontendURL из заголовка Origin или Referer, 
+	// Пытаемся получить frontendURL из заголовка Origin или Referer,
 	// чтобы редирект был на правильный сайт
 	frontendURL := r.Header.Get("Origin")
 	if frontendURL == "" {
@@ -56,7 +56,7 @@ func (h *Handler) GetAuthURL(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Если мы получили Origin (например, http://localhost:5173), 
+	// Если мы получили Origin (например, http://localhost:5173),
 	// добавляем путь для callback, если его нет
 	if frontendURL != "" {
 		// Извлекаем путь из конфига (например, /auth/callback)
@@ -247,10 +247,12 @@ func (h *Handler) redirectWithTokens(w http.ResponseWriter, r *http.Request, fro
 
 	// Устанавливаем refresh_token в cookie
 	http.SetCookie(w, &http.Cookie{
-		Name:     refreshTokenCookieName,
-		Value:    refreshToken,
-		Path:     "/",
-		HttpOnly: true, // Сделаем HttpOnly для безопасности
+		Name:  refreshTokenCookieName,
+		Value: refreshToken,
+		Path:  "/",
+		// Делаем доступным из JS, как в обычном /auth/login,
+		// чтобы фронт мог положить токен в стор
+		HttpOnly: false,
 		Secure:   h.isProd,
 		SameSite: sameSite,
 		MaxAge:   refreshTokenMaxAge,
