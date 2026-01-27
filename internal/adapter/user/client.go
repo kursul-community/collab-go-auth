@@ -65,11 +65,16 @@ func (c *client) UpdateGitURL(ctx context.Context, userID, gitURL, accessToken s
 	if profile == nil || profile.GetUsername() == "" {
 		return status.Error(codes.InvalidArgument, "username is required")
 	}
+	if profile.GetPosition() == "" {
+		return status.Error(codes.InvalidArgument, "position is required")
+	}
 
 	_, err = c.userClient.CreateProfile(ctx, &pb.UpdateProfileRequest{
-		UserId: userID,
-		Username: profile.GetUsername(),
-		GitUrl: gitURL,
+		UserId:    userID,
+		Username:  profile.GetUsername(),
+		AboutInfo: profile.GetAboutInfo(),
+		Position:  profile.GetPosition(),
+		GitUrl:    gitURL,
 	})
 	return err
 }
