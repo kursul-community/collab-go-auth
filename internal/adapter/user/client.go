@@ -57,8 +57,18 @@ func (c *client) UpdateGitURL(ctx context.Context, userID, gitURL, accessToken s
 		ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+accessToken)
 	}
 
-	_, err := c.userClient.CreateProfile(ctx, &pb.UpdateProfileRequest{
+	profileResp, err := c.userClient.GetProfileByID(ctx, &pb.GetProfileByIDRequest{UserId: userID})
+	if err != nil {
+		return err
+	}
+	profile := profileResp.GetProfile()
+	if profile == nil || profile.GetUsername() == "" {
+		return status.Error(codes.InvalidArgument, "username is required")
+	}
+
+	_, err = c.userClient.CreateProfile(ctx, &pb.UpdateProfileRequest{
 		UserId: userID,
+		Username: profile.GetUsername(),
 		GitUrl: gitURL,
 	})
 	return err

@@ -229,13 +229,6 @@ func (uc *oauthUseCase) HandleCallback(providerName, code, state string) (string
 		return "", "", "", false, err
 	}
 
-	if providerName == "github" && userInfo.Username != "" && uc.userClient != nil {
-		gitURL := fmt.Sprintf("https://github.com/%s", userInfo.Username)
-		if err := uc.userClient.UpdateGitURL(ctx, user.ID, gitURL, ""); err != nil {
-			log.Printf("OAuth: failed to update git_url for user %s: %v", user.ID, err)
-		}
-	}
-
 	// Генерируем JWT токены
 	accessToken, err := uc.tokenService.GenerateAccessToken(user)
 	if err != nil {
@@ -245,6 +238,13 @@ func (uc *oauthUseCase) HandleCallback(providerName, code, state string) (string
 	refreshToken, err := uc.tokenService.GenerateRefreshToken(user)
 	if err != nil {
 		return "", "", "", false, err
+	}
+
+	if providerName == "github" && userInfo.Username != "" && uc.userClient != nil {
+		gitURL := fmt.Sprintf("https://github.com/%s", userInfo.Username)
+		if err := uc.userClient.UpdateGitURL(ctx, user.ID, gitURL, accessToken); err != nil {
+			log.Printf("OAuth: failed to update git_url for user %s: %v", user.ID, err)
+		}
 	}
 
 	// Сохраняем токены в Redis
