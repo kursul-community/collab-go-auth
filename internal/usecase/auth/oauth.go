@@ -50,6 +50,7 @@ type OAuthStateData struct {
 	FrontendURL string `json:"frontend_url"`
 	Flow        string `json:"flow,omitempty"`
 	UserID      string `json:"user_id,omitempty"`
+	AccessToken string `json:"access_token,omitempty"`
 }
 
 // ProviderResponse - ответ для списка провайдеров
@@ -91,48 +92,13 @@ func (uc *oauthUseCase) GetAuthURLWithFlow(providerName, frontendURL, flow strin
 
 // GetAuthURLWithFlowAndUser - генерирует URL для OAuth авторизации с учетом потока и userID
 func (uc *oauthUseCase) GetAuthURLWithFlowAndUser(providerName, frontendURL, flow, userID string) (string, string, error) {
-	ctx := context.Background()
-
-	// Получаем провайдера
-	provider, err := uc.oauthManager.GetProvider(providerName)
-	if err != nil {
-		log.Printf("OAuth: provider %s not found", providerName)
-		return "", "", ErrOAuthProviderNotFound
-	}
-
-	// Генерируем state для CSRF защиты
-	state, err := oauth.GenerateState()
-	if err != nil {
-		log.Printf("OAuth: failed to generate state: %v", err)
-		return "", "", err
-	}
-
-	// Подготавливаем данные для сохранения
 	stateData := OAuthStateData{
 		Provider:    providerName,
 		FrontendURL: frontendURL,
 		Flow:        flow,
 		UserID:      userID,
 	}
-	jsonData, _ := json.Marshal(stateData)
-
-	// Сохраняем state в Redis
-	log.Printf("OAuth: storing state '%s' for provider '%s' with TTL %v", state, providerName, uc.stateTTL)
-	err = uc.tokenRepo.StoreOAuthState(ctx, state, string(jsonData), uc.stateTTL)
-	if err != nil {
-		log.Printf("OAuth: failed to store state in Redis: %v", err)
-		return "", "", err
-	}
-	log.Printf("OAuth: state stored successfully")
-
-	// Формируем callback URL
-	callbackURL := uc.oauthManager.GetCallbackURL(providerName)
-
-	// Получаем URL авторизации
-	authURL := provider.GetAuthURL(state, callbackURL)
-
-	log.Printf("OAuth: generated auth URL for provider %s", providerName)
-	return authURL, state, nil
+	return uc.getAuthURLWithStateData(providerName, stateData)
 }
 
 // GetAuthURLForGitHubLink - получает URL для привязки GitHub к текущему пользователю
@@ -150,7 +116,15 @@ func (uc *oauthUseCase) GetAuthURLForGitHubLink(frontendURL, accessToken string)
 		return "", "", err
 	}
 
-	return uc.GetAuthURLWithFlowAndUser("github", frontendURL, OAuthFlowGitHubLink, userID)
+	stateData := OAuthStateData{
+		Provider:    "github",
+		FrontendURL: frontendURL,
+		Flow:        OAuthFlowGitHubLink,
+		UserID:      userID,
+		AccessToken: accessToken,
+	}
+
+	return uc.getAuthURLWithStateData("github", stateData)
 }
 
 // HandleCallback - обрабатывает callback от OAuth провайдера
@@ -222,15 +196,25 @@ func (uc *oauthUseCase) HandleCallback(providerName, code, state string) (string
 		if stateData.UserID == "" {
 			return "", "", "", false, ErrOAuthInvalidState
 		}
+		if stateData.AccessToken == "" {
+			return "", "", "", false, ErrOAuthInvalidState
+		}
 		if userInfo.Username == "" {
 			return "", "", "", false, ErrOAuthUserInfoFailed
 		}
 		if uc.userClient == nil {
 			return "", "", "", false, errors.New("user client is not configured")
 		}
+		isValid, err := uc.ValidateToken(stateData.AccessToken)
+		if err != nil || !isValid {
+			if err != nil {
+				return "", "", "", false, err
+			}
+			return "", "", "", false, ErrAccessTokenNotFound
+		}
 
 		gitURL := fmt.Sprintf("https://github.com/%s", userInfo.Username)
-		if err := uc.userClient.UpdateGitURL(ctx, stateData.UserID, gitURL); err != nil {
+		if err := uc.userClient.UpdateGitURL(ctx, stateData.UserID, gitURL, stateData.AccessToken); err != nil {
 			log.Printf("OAuth: failed to update git_url for user %s: %v", stateData.UserID, err)
 			return "", "", "", false, err
 		}
@@ -247,7 +231,7 @@ func (uc *oauthUseCase) HandleCallback(providerName, code, state string) (string
 
 	if providerName == "github" && userInfo.Username != "" && uc.userClient != nil {
 		gitURL := fmt.Sprintf("https://github.com/%s", userInfo.Username)
-		if err := uc.userClient.UpdateGitURL(ctx, user.ID, gitURL); err != nil {
+		if err := uc.userClient.UpdateGitURL(ctx, user.ID, gitURL, ""); err != nil {
 			log.Printf("OAuth: failed to update git_url for user %s: %v", user.ID, err)
 		}
 	}
@@ -300,6 +284,44 @@ func (uc *oauthUseCase) HandleCallback(providerName, code, state string) (string
 	}
 
 	return accessToken, refreshToken, redirectURL, true, nil
+}
+
+func (uc *oauthUseCase) getAuthURLWithStateData(providerName string, stateData OAuthStateData) (string, string, error) {
+	ctx := context.Background()
+
+	// Получаем провайдера
+	provider, err := uc.oauthManager.GetProvider(providerName)
+	if err != nil {
+		log.Printf("OAuth: provider %s not found", providerName)
+		return "", "", ErrOAuthProviderNotFound
+	}
+
+	// Генерируем state для CSRF защиты
+	state, err := oauth.GenerateState()
+	if err != nil {
+		log.Printf("OAuth: failed to generate state: %v", err)
+		return "", "", err
+	}
+
+	jsonData, _ := json.Marshal(stateData)
+
+	// Сохраняем state в Redis
+	log.Printf("OAuth: storing state '%s' for provider '%s' with TTL %v", state, providerName, uc.stateTTL)
+	err = uc.tokenRepo.StoreOAuthState(ctx, state, string(jsonData), uc.stateTTL)
+	if err != nil {
+		log.Printf("OAuth: failed to store state in Redis: %v", err)
+		return "", "", err
+	}
+	log.Printf("OAuth: state stored successfully")
+
+	// Формируем callback URL
+	callbackURL := uc.oauthManager.GetCallbackURL(providerName)
+
+	// Получаем URL авторизации
+	authURL := provider.GetAuthURL(state, callbackURL)
+
+	log.Printf("OAuth: generated auth URL for provider %s", providerName)
+	return authURL, state, nil
 }
 
 // findOrCreateOAuthUser - ищет существующего пользователя или создает нового

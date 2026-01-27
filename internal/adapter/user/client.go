@@ -9,12 +9,13 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
 type Client interface {
 	ProfileExists(ctx context.Context, userID string) (bool, error)
-	UpdateGitURL(ctx context.Context, userID, gitURL string) error
+	UpdateGitURL(ctx context.Context, userID, gitURL, accessToken string) error
 }
 
 type client struct {
@@ -51,7 +52,11 @@ func (c *client) ProfileExists(ctx context.Context, userID string) (bool, error)
 	return true, nil
 }
 
-func (c *client) UpdateGitURL(ctx context.Context, userID, gitURL string) error {
+func (c *client) UpdateGitURL(ctx context.Context, userID, gitURL, accessToken string) error {
+	if accessToken != "" {
+		ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+accessToken)
+	}
+
 	_, err := c.userClient.CreateProfile(ctx, &pb.UpdateProfileRequest{
 		UserId: userID,
 		GitUrl: gitURL,
