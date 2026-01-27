@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"go-auth/internal/adapter/oauth"
 	"go-auth/internal/entity"
@@ -215,6 +217,18 @@ func (uc *oauthUseCase) HandleCallback(providerName, code, state string) (string
 
 		gitURL := fmt.Sprintf("https://github.com/%s", userInfo.Username)
 		if err := uc.userClient.UpdateGitURL(ctx, stateData.UserID, gitURL, stateData.AccessToken); err != nil {
+			if status.Code(err) == codes.NotFound {
+				redirectURL := stateData.FrontendURL
+				if parsed, parseErr := url.Parse(stateData.FrontendURL); parseErr == nil {
+					q := parsed.Query()
+					q.Set("git_url", gitURL)
+					parsed.RawQuery = q.Encode()
+					redirectURL = parsed.String()
+				} else {
+					log.Printf("OAuth: failed to parse frontend URL '%s': %v", stateData.FrontendURL, parseErr)
+				}
+				return "", "", redirectURL, false, nil
+			}
 			log.Printf("OAuth: failed to update git_url for user %s: %v", stateData.UserID, err)
 			return "", "", "", false, err
 		}
