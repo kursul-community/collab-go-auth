@@ -241,6 +241,15 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 
 	// Регистрируем OAuth роуты (если OAuth включен)
 	if oauthHandler != nil {
+		// GET /api/v1/auth/oauth/github/start - старт привязки GitHub
+		mainMux.HandleFunc("/api/v1/auth/oauth/github/start", func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodGet || r.Method == http.MethodOptions {
+				oauthHandler.GetGitHubStart(w, r)
+			} else {
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			}
+		})
+
 		// GET /api/v1/auth/oauth/providers - список провайдеров
 		mainMux.HandleFunc("/api/v1/auth/oauth/providers", func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodGet || r.Method == http.MethodOptions {

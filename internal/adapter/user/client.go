@@ -14,6 +14,7 @@ import (
 
 type Client interface {
 	ProfileExists(ctx context.Context, userID string) (bool, error)
+	UpdateGitURL(ctx context.Context, userID, gitURL string) error
 }
 
 type client struct {
@@ -48,4 +49,12 @@ func (c *client) ProfileExists(ctx context.Context, userID string) (bool, error)
 
 	// Профиль существует, если user-service вернул запись, независимо от заполненности.
 	return true, nil
+}
+
+func (c *client) UpdateGitURL(ctx context.Context, userID, gitURL string) error {
+	_, err := c.userClient.CreateProfile(ctx, &pb.UpdateProfileRequest{
+		UserId: userID,
+		GitUrl: gitURL,
+	})
+	return err
 }

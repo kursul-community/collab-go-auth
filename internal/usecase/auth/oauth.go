@@ -18,6 +18,8 @@ import (
 // TTL для OAuth state (10 минут)
 const OAuthStateTTL = 10 * time.Minute
 
+const OAuthFlowGitHubLink = "github_link"
+
 var (
 	ErrOAuthProviderNotFound   = errors.New("oauth provider not found")
 	ErrOAuthProviderNotEnabled = errors.New("oauth provider not enabled")
@@ -30,6 +32,8 @@ var (
 type OAuthUseCase interface {
 	// GetAuthURL - получает URL для OAuth авторизации
 	GetAuthURL(provider, frontendURL string) (authURL, state string, err error)
+	// GetAuthURLWithFlow - получает URL для OAuth авторизации с учетом потока
+	GetAuthURLWithFlow(provider, frontendURL, flow string) (authURL, state string, err error)
 	// HandleCallback - обрабатывает callback от OAuth провайдера
 	HandleCallback(provider, code, state string) (accessToken, refreshToken, redirectURL string, err error)
 	// GetProviders - возвращает список доступных OAuth провайдеров с ссылками
@@ -40,6 +44,7 @@ type OAuthUseCase interface {
 type OAuthStateData struct {
 	Provider    string `json:"provider"`
 	FrontendURL string `json:"frontend_url"`
+	Flow        string `json:"flow,omitempty"`
 }
 
 // ProviderResponse - ответ для списка провайдеров
@@ -71,6 +76,11 @@ func NewOAuthUseCase(baseAuth *auth, oauthManager *oauth.Manager, stateTTL time.
 
 // GetAuthURL - генерирует URL для OAuth авторизации
 func (uc *oauthUseCase) GetAuthURL(providerName, frontendURL string) (string, string, error) {
+	return uc.GetAuthURLWithFlow(providerName, frontendURL, "")
+}
+
+// GetAuthURLWithFlow - генерирует URL для OAuth авторизации с учетом потока
+func (uc *oauthUseCase) GetAuthURLWithFlow(providerName, frontendURL, flow string) (string, string, error) {
 	ctx := context.Background()
 
 	// Получаем провайдера
@@ -91,6 +101,7 @@ func (uc *oauthUseCase) GetAuthURL(providerName, frontendURL string) (string, st
 	stateData := OAuthStateData{
 		Provider:    providerName,
 		FrontendURL: frontendURL,
+		Flow:        flow,
 	}
 	jsonData, _ := json.Marshal(stateData)
 
@@ -182,6 +193,13 @@ func (uc *oauthUseCase) HandleCallback(providerName, code, state string) (string
 		return "", "", "", err
 	}
 
+	if providerName == "github" && userInfo.Username != "" && uc.userClient != nil {
+		gitURL := fmt.Sprintf("https://github.com/%s", userInfo.Username)
+		if err := uc.userClient.UpdateGitURL(ctx, user.ID, gitURL); err != nil {
+			log.Printf("OAuth: failed to update git_url for user %s: %v", user.ID, err)
+		}
+	}
+
 	// Генерируем JWT токены
 	accessToken, err := uc.tokenService.GenerateAccessToken(user)
 	if err != nil {
@@ -208,7 +226,7 @@ func (uc *oauthUseCase) HandleCallback(providerName, code, state string) (string
 
 	// Определяем, куда редиректить пользователя: на главную или на создание профиля
 	redirectURL := stateData.FrontendURL
-	if uc.userClient != nil {
+	if stateData.Flow != OAuthFlowGitHubLink && uc.userClient != nil {
 		exists, err := uc.userClient.ProfileExists(ctx, user.ID)
 		if err != nil {
 			log.Printf("OAuth: failed to check profile existence for user %s: %v", user.ID, err)

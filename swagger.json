@@ -630,6 +630,49 @@
         }
       }
     },
+    "/auth/oauth/github/start": {
+      "get": {
+        "tags": ["OAuth2"],
+        "summary": "Старт привязки GitHub аккаунта",
+        "description": "Возвращает ссылку для редиректа на GitHub OAuth. После успешной авторизации редиректит пользователя обратно на исходную страницу.",
+        "operationId": "oauthGitHubStart",
+        "parameters": [
+          {
+            "name": "redirect_url",
+            "in": "query",
+            "required": false,
+            "description": "URL для возврата после авторизации (по умолчанию из Referer/Origin или конфига)",
+            "schema": {
+              "type": "string",
+              "format": "uri",
+              "example": "http://localhost:5173/profile"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "URL для перенаправления пользователя на GitHub",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthGitHubStartResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Некорректный redirect_url или ошибка формирования ссылки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/oauth/providers": {
       "get": {
         "tags": ["OAuth2"],
@@ -917,6 +960,18 @@
             "items": {
               "$ref": "#/components/schemas/OAuthAuthUrlResponse"
             }
+          }
+        }
+      },
+      "OAuthGitHubStartResponse": {
+        "type": "object",
+        "required": ["redirect_url"],
+        "properties": {
+          "redirect_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL для редиректа на GitHub OAuth",
+            "example": "https://github.com/login/oauth/authorize?client_id=...&redirect_uri=...&scope=read:user%20user:email&state=abc123"
           }
         }
       }

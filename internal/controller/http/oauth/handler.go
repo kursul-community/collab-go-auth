@@ -87,6 +87,45 @@ func (h *Handler) GetAuthURL(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GetGitHubStart обрабатывает GET /api/v1/auth/oauth/github/start
+// Возвращает URL для редиректа на GitHub OAuth для привязки аккаунта
+func (h *Handler) GetGitHubStart(w http.ResponseWriter, r *http.Request) {
+	if h.oauth == nil {
+		writeError(w, http.StatusServiceUnavailable, "OAuth is not configured")
+		return
+	}
+
+	redirectURL := r.URL.Query().Get("redirect_url")
+	if redirectURL == "" {
+		redirectURL = r.URL.Query().Get("redirectUrl")
+	}
+	if redirectURL == "" {
+		redirectURL = r.Header.Get("Referer")
+	}
+	if redirectURL == "" {
+		redirectURL = r.Header.Get("Origin")
+	}
+	if redirectURL == "" {
+		redirectURL = h.frontendURL
+	}
+
+	if _, err := url.Parse(redirectURL); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid redirect_url")
+		return
+	}
+
+	authURL, _, err := h.oauth.GetAuthURLWithFlow("github", redirectURL, usecase.OAuthFlowGitHubLink)
+	if err != nil {
+		log.Printf("OAuth: GetGitHubStart error: %v", err)
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"redirect_url": authURL,
+	})
+}
+
 // Callback обрабатывает GET /api/v1/auth/oauth/{provider}/callback
 // Вызывается OAuth провайдером после авторизации пользователя
 func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {

@@ -342,6 +342,7 @@ func (p *githubProvider) GetUserInfo(ctx context.Context, accessToken string) (*
 		Email:    email,
 		Name:     data.Name,
 		Avatar:   data.AvatarURL,
+		Username: data.Login,
 		Provider: "github",
 	}, nil
 }
