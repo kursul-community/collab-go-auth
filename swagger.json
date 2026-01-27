@@ -634,7 +634,7 @@
       "get": {
         "tags": ["OAuth2"],
         "summary": "Старт привязки GitHub аккаунта",
-        "description": "Возвращает ссылку для редиректа на GitHub OAuth. После успешной авторизации редиректит пользователя обратно на исходную страницу.",
+        "description": "Возвращает ссылку для редиректа на GitHub OAuth. Требует access token (cookie `access_token` или заголовок Authorization). После успешной авторизации редиректит пользователя обратно на исходную страницу и обновляет git_url профиля.",
         "operationId": "oauthGitHubStart",
         "parameters": [
           {
@@ -662,6 +662,16 @@
           },
           "400": {
             "description": "Некорректный redirect_url или ошибка формирования ссылки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Необходим access token для привязки",
             "content": {
               "application/json": {
                 "schema": {

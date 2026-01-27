@@ -114,7 +114,13 @@ func (h *Handler) GetGitHubStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authURL, _, err := h.oauth.GetAuthURLWithFlow("github", redirectURL, usecase.OAuthFlowGitHubLink)
+	accessToken := extractAccessToken(r)
+	if accessToken == "" {
+		writeError(w, http.StatusUnauthorized, "access token required")
+		return
+	}
+
+	authURL, _, err := h.oauth.GetAuthURLForGitHubLink(redirectURL, accessToken)
 	if err != nil {
 		log.Printf("OAuth: GetGitHubStart error: %v", err)
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -166,7 +172,7 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Обрабатываем callback
-	accessToken, refreshToken, redirectURL, err := h.oauth.HandleCallback(provider, code, state)
+	accessToken, refreshToken, redirectURL, issueTokens, err := h.oauth.HandleCallback(provider, code, state)
 	if err != nil {
 		log.Printf("OAuth: Callback error: %v", err)
 		redirectWithError(w, r, h.frontendURL, "auth_failed", err.Error())
@@ -179,8 +185,14 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 		finalFrontendURL = redirectURL
 	}
 
-	// Редиректим на фронтенд с токенами
-	h.redirectWithTokens(w, r, finalFrontendURL, accessToken, refreshToken)
+	if issueTokens {
+		// Редиректим на фронтенд с токенами
+		h.redirectWithTokens(w, r, finalFrontendURL, accessToken, refreshToken)
+		return
+	}
+
+	log.Printf("OAuth: Redirecting to frontend without tokens")
+	http.Redirect(w, r, finalFrontendURL, http.StatusFound)
 }
 
 // GetProviders обрабатывает GET /api/v1/auth/oauth/providers
@@ -330,4 +342,20 @@ func writeError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, map[string]string{
 		"error": message,
 	})
+}
+
+func extractAccessToken(r *http.Request) string {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader != "" {
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) == 2 && strings.EqualFold(parts[0], "bearer") && parts[1] != "" {
+			return parts[1]
+		}
+	}
+
+	if cookie, err := r.Cookie(accessTokenCookieName); err == nil && cookie.Value != "" {
+		return cookie.Value
+	}
+
+	return ""
 }
