@@ -154,6 +154,17 @@ func (s *AuthServer) RefreshToken(ctx context.Context, req *pb.RefreshTokenReque
 	}, nil
 }
 
+// Logout - выход пользователя, отзыв refresh и access токенов
+func (s *AuthServer) Logout(ctx context.Context, req *pb.LogoutRequest) (*pb.LogoutResponse, error) {
+	if err := s.auth.Logout(req.RefreshToken); err != nil {
+		if errors.Is(err, usecase.ErrInvalidRefreshToken) || errors.Is(err, usecase.ErrRefreshTokenNotFound) {
+			return nil, status.Error(codes.Unauthenticated, err.Error())
+		}
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return &pb.LogoutResponse{}, nil
+}
+
 // ValidateToken - проверка токена
 func (s *AuthServer) ValidateToken(ctx context.Context, req *pb.ValidateTokenRequest) (*pb.ValidateTokenResponse, error) {
 	valid, err := s.auth.ValidateToken(req.AccessToken)

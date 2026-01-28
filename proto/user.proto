@@ -22,10 +22,20 @@ service UserService {
     };
   }
 
-  // Получить профиль любого пользователя по ID
+  // Получить профиль любого пользователя по username
   rpc GetProfile(GetProfileRequest) returns (GetProfileResponse) {
     option (google.api.http) = {
-      get: "/api/v1/user/profile/{user_id}"
+      get: "/user/profile/{username}"
+      additional_bindings {
+        get: "/api/v1/user/profile/{username}"
+      }
+    };
+  }
+
+  // Получить профиль пользователя по user_id
+  rpc GetProfileByID(GetProfileByIDRequest) returns (GetProfileResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/user/profile-by-id/{user_id}"
     };
   }
 
@@ -49,8 +59,9 @@ message UserProfile {
   string about_info = 3;
   string git_url = 4;
   string position = 5;
-  string created_at = 6;
-  string updated_at = 7;
+  string avatar_url = 6;
+  string created_at = 7;
+  string updated_at = 8;
 }
 
 message UpdateProfileRequest {
@@ -72,6 +83,10 @@ message GetMyProfileResponse {
 }
 
 message GetProfileRequest {
+  string username = 1;
+}
+
+message GetProfileByIDRequest {
   string user_id = 1;
 }
 
