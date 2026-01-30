@@ -281,6 +281,18 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 		logger.Printf("OAuth routes registered")
 	}
 
+	// Health и Ready endpoints для Kubernetes probes
+	mainMux.HandleFunc("/api/v1/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	mainMux.HandleFunc("/api/v1/ready", func(w http.ResponseWriter, r *http.Request) {
+		// Можно добавить проверку подключения к БД/Redis, если нужно
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
 	// gRPC Gateway обрабатывает остальные запросы
 	mainMux.Handle("/", grpcMux)
 
