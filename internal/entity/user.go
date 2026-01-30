@@ -25,5 +25,6 @@ type OAuthUserInfo struct {
 	Email    string // Email пользователя
 	Name     string // Имя пользователя (опционально)
 	Avatar   string // URL аватара (опционально)
+	Username string // Username пользователя (опционально)
 	Provider string // Имя провайдера
 }
