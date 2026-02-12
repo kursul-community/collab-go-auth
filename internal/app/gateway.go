@@ -241,6 +241,15 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 
 	// Регистрируем OAuth роуты (если OAuth включен)
 	if oauthHandler != nil {
+		// GET /api/v1/auth/oauth/github/start - старт привязки GitHub
+		mainMux.HandleFunc("/api/v1/auth/oauth/github/start", func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodGet || r.Method == http.MethodOptions {
+				oauthHandler.GetGitHubStart(w, r)
+			} else {
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			}
+		})
+
 		// GET /api/v1/auth/oauth/providers - список провайдеров
 		mainMux.HandleFunc("/api/v1/auth/oauth/providers", func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodGet || r.Method == http.MethodOptions {
@@ -272,33 +281,16 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 		logger.Printf("OAuth routes registered")
 	}
 
-	// Swagger UI (использует CDN)
-	mainMux.HandleFunc("/api/v1/swagger", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write([]byte(`<!DOCTYPE html>
-	<html>
-	<head>
-		<title>Collab API - Swagger UI</title>
-		<link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css" />
-	</head>
-	<body>
-		<div id="swagger-ui"></div>
-		<script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js"></script>
-		<script>
-			window.onload = () => {
-				SwaggerUIBundle({
-					url: '/api/v1/swagger/spec',
-					dom_id: '#swagger-ui'
-				});
-			};
-		</script>
-	</body>
-	</html>`))
+	// Health и Ready endpoints для Kubernetes probes
+	mainMux.HandleFunc("/api/v1/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
 	})
-	// Swagger JSON spec
-	mainMux.HandleFunc("/api/v1/swagger/spec", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		http.ServeFile(w, r, "./swagger-combined.json")
+
+	mainMux.HandleFunc("/api/v1/ready", func(w http.ResponseWriter, r *http.Request) {
+		// Можно добавить проверку подключения к БД/Redis, если нужно
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
 	})
 
 	// gRPC Gateway обрабатывает остальные запросы
@@ -359,18 +351,16 @@ func corsMiddleware(cfg *config.Config, next http.Handler) http.Handler {
 	})
 }
 
-// cookieMiddleware - устанавливает токены в cookies для /auth/login и /auth/refresh
+// cookieMiddleware - управляет cookies для /auth/login, /auth/refresh и /auth/logout
 func cookieMiddleware(cfg *config.Config, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Определяем, безопасное ли соединение (TLS или HTTPS за прокси)
-		isHTTPS := r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
-
 		// Проверяем, нужно ли обрабатывать этот путь
 		path := r.URL.Path
 		isLoginPath := strings.HasSuffix(path, "/auth/login")
 		isRefreshPath := strings.HasSuffix(path, "/auth/refresh")
+		isLogoutPath := strings.HasSuffix(path, "/auth/logout")
 
-		if !isLoginPath && !isRefreshPath {
+		if !isLoginPath && !isRefreshPath && !isLogoutPath {
 			// Не наш путь, пропускаем
 			next.ServeHTTP(w, r)
 			return
@@ -404,38 +394,66 @@ func cookieMiddleware(cfg *config.Config, next http.Handler) http.Handler {
 				}
 			}
 
-			var response map[string]interface{}
-			if err := json.Unmarshal(bw.buf.Bytes(), &response); err == nil {
-				// Определяем настройки cookies в зависимости от окружения
-				isDev := cfg != nil && cfg.App.IsDevelopment()
-				sameSite := http.SameSiteLaxMode
-				secure := isHTTPS
-				if isDev {
-					// В dev хотим SameSite=None, но браузер требует Secure.
-					// Если HTTPS нет, оставляем Lax, иначе куки будут отброшены.
-					if isHTTPS {
-						sameSite = http.SameSiteNoneMode
-						secure = true
-					} else {
-						sameSite = http.SameSiteLaxMode
-						secure = false
+			// Определяем настройки cookies в зависимости от окружения
+			isProd := cfg.App.Env == "production"
+			sameSite := http.SameSiteLaxMode
+			if isProd {
+				sameSite = http.SameSiteNoneMode // Для кросс-доменных запросов в прод
+			}
+
+			if isLogoutPath {
+				// Для logout очищаем cookies
+				http.SetCookie(w, &http.Cookie{
+					Name:     AccessTokenCookieName,
+					Value:    "",
+					Path:     "/",
+					HttpOnly: true,
+					Secure:   isProd,
+					SameSite: sameSite,
+					MaxAge:   0,
+				})
+				http.SetCookie(w, &http.Cookie{
+					Name:     RefreshTokenCookieName,
+					Value:    "",
+					Path:     "/",
+					HttpOnly: true,
+					Secure:   isProd,
+					SameSite: sameSite,
+					MaxAge:   0,
+				})
+			} else {
+				var response map[string]interface{}
+				if err := json.Unmarshal(bw.buf.Bytes(), &response); err == nil {
+					accessToken := getStringField(response, "accessToken", "access_token")
+					if accessToken != "" {
+						http.SetCookie(w, &http.Cookie{
+							Name:     AccessTokenCookieName,
+							Value:    accessToken,
+							Path:     "/",
+							HttpOnly: true,
+							Secure:   isProd, // true только для HTTPS
+							SameSite: sameSite,
+							MaxAge:   AccessTokenMaxAge,
+						})
+					}
+
+					// Устанавливаем refresh_token в cookie для login и refresh,
+					// чтобы клиент всегда получал актуальный токен после обновления
+					if isLoginPath || isRefreshPath {
+						refreshToken := getStringField(response, "refreshToken", "refresh_token")
+						if refreshToken != "" {
+							http.SetCookie(w, &http.Cookie{
+								Name:     RefreshTokenCookieName,
+								Value:    refreshToken,
+								Path:     "/",
+								HttpOnly: true, // Безопаснее сделать HttpOnly
+								Secure:   isProd,
+								SameSite: sameSite,
+								MaxAge:   RefreshTokenMaxAge,
+							})
+						}
 					}
 				}
-
-				accessToken := getStringField(response, "accessToken", "access_token")
-				if accessToken != "" {
-					http.SetCookie(w, &http.Cookie{
-						Name:     AccessTokenCookieName,
-						Value:    accessToken,
-						Path:     "/",
-						HttpOnly: true,
-						Secure:   secure,
-						SameSite: sameSite,
-						MaxAge:   AccessTokenMaxAge,
-					})
-				}
-
-				// refresh_token не устанавливаем в cookie — он должен возвращаться в body
 			}
 		}
 

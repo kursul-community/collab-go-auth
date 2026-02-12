@@ -10,7 +10,6 @@ package auth
 
 import (
 	"context"
-	"errors"
 	"io"
 	"net/http"
 
@@ -25,245 +24,262 @@ import (
 )
 
 // Suppress "imported and not used" errors
-var (
-	_ codes.Code
-	_ io.Reader
-	_ status.Status
-	_ = errors.New
-	_ = runtime.String
-	_ = utilities.NewDoubleArray
-	_ = metadata.Join
-)
+var _ codes.Code
+var _ io.Reader
+var _ status.Status
+var _ = runtime.String
+var _ = utilities.NewDoubleArray
+var _ = metadata.Join
 
 func request_Auth_Register_0(ctx context.Context, marshaler runtime.Marshaler, client AuthClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq RegisterRequest
-		metadata runtime.ServerMetadata
-	)
-	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+	var protoReq RegisterRequest
+	var metadata runtime.ServerMetadata
+
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && err != io.EOF {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	if req.Body != nil {
-		_, _ = io.Copy(io.Discard, req.Body)
-	}
+
 	msg, err := client.Register(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
+
 }
 
 func local_request_Auth_Register_0(ctx context.Context, marshaler runtime.Marshaler, server AuthServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq RegisterRequest
-		metadata runtime.ServerMetadata
-	)
-	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+	var protoReq RegisterRequest
+	var metadata runtime.ServerMetadata
+
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && err != io.EOF {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
+
 	msg, err := server.Register(ctx, &protoReq)
 	return msg, metadata, err
+
 }
 
 func request_Auth_Login_0(ctx context.Context, marshaler runtime.Marshaler, client AuthClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq LoginRequest
-		metadata runtime.ServerMetadata
-	)
-	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+	var protoReq LoginRequest
+	var metadata runtime.ServerMetadata
+
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && err != io.EOF {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	if req.Body != nil {
-		_, _ = io.Copy(io.Discard, req.Body)
-	}
+
 	msg, err := client.Login(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
+
 }
 
 func local_request_Auth_Login_0(ctx context.Context, marshaler runtime.Marshaler, server AuthServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq LoginRequest
-		metadata runtime.ServerMetadata
-	)
-	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+	var protoReq LoginRequest
+	var metadata runtime.ServerMetadata
+
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && err != io.EOF {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
+
 	msg, err := server.Login(ctx, &protoReq)
 	return msg, metadata, err
+
 }
 
 func request_Auth_RefreshToken_0(ctx context.Context, marshaler runtime.Marshaler, client AuthClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq RefreshTokenRequest
-		metadata runtime.ServerMetadata
-	)
-	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+	var protoReq RefreshTokenRequest
+	var metadata runtime.ServerMetadata
+
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && err != io.EOF {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	if req.Body != nil {
-		_, _ = io.Copy(io.Discard, req.Body)
-	}
+
 	msg, err := client.RefreshToken(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
+
 }
 
 func local_request_Auth_RefreshToken_0(ctx context.Context, marshaler runtime.Marshaler, server AuthServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq RefreshTokenRequest
-		metadata runtime.ServerMetadata
-	)
-	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+	var protoReq RefreshTokenRequest
+	var metadata runtime.ServerMetadata
+
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && err != io.EOF {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
+
 	msg, err := server.RefreshToken(ctx, &protoReq)
 	return msg, metadata, err
+
+}
+
+func request_Auth_Logout_0(ctx context.Context, marshaler runtime.Marshaler, client AuthClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var protoReq LogoutRequest
+	var metadata runtime.ServerMetadata
+
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && err != io.EOF {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+
+	msg, err := client.Logout(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+
+}
+
+func local_request_Auth_Logout_0(ctx context.Context, marshaler runtime.Marshaler, server AuthServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var protoReq LogoutRequest
+	var metadata runtime.ServerMetadata
+
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && err != io.EOF {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+
+	msg, err := server.Logout(ctx, &protoReq)
+	return msg, metadata, err
+
 }
 
 func request_Auth_ValidateToken_0(ctx context.Context, marshaler runtime.Marshaler, client AuthClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq ValidateTokenRequest
-		metadata runtime.ServerMetadata
-	)
-	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+	var protoReq ValidateTokenRequest
+	var metadata runtime.ServerMetadata
+
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && err != io.EOF {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	if req.Body != nil {
-		_, _ = io.Copy(io.Discard, req.Body)
-	}
+
 	msg, err := client.ValidateToken(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
+
 }
 
 func local_request_Auth_ValidateToken_0(ctx context.Context, marshaler runtime.Marshaler, server AuthServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq ValidateTokenRequest
-		metadata runtime.ServerMetadata
-	)
-	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+	var protoReq ValidateTokenRequest
+	var metadata runtime.ServerMetadata
+
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && err != io.EOF {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
+
 	msg, err := server.ValidateToken(ctx, &protoReq)
 	return msg, metadata, err
+
 }
 
 func request_Auth_ResendVerificationEmail_0(ctx context.Context, marshaler runtime.Marshaler, client AuthClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq ResendVerificationEmailRequest
-		metadata runtime.ServerMetadata
-	)
-	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+	var protoReq ResendVerificationEmailRequest
+	var metadata runtime.ServerMetadata
+
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && err != io.EOF {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	if req.Body != nil {
-		_, _ = io.Copy(io.Discard, req.Body)
-	}
+
 	msg, err := client.ResendVerificationEmail(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
+
 }
 
 func local_request_Auth_ResendVerificationEmail_0(ctx context.Context, marshaler runtime.Marshaler, server AuthServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq ResendVerificationEmailRequest
-		metadata runtime.ServerMetadata
-	)
-	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+	var protoReq ResendVerificationEmailRequest
+	var metadata runtime.ServerMetadata
+
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && err != io.EOF {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
+
 	msg, err := server.ResendVerificationEmail(ctx, &protoReq)
 	return msg, metadata, err
+
 }
 
 func request_Auth_VerifyEmail_0(ctx context.Context, marshaler runtime.Marshaler, client AuthClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq VerifyEmailRequest
-		metadata runtime.ServerMetadata
-	)
-	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+	var protoReq VerifyEmailRequest
+	var metadata runtime.ServerMetadata
+
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && err != io.EOF {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	if req.Body != nil {
-		_, _ = io.Copy(io.Discard, req.Body)
-	}
+
 	msg, err := client.VerifyEmail(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
+
 }
 
 func local_request_Auth_VerifyEmail_0(ctx context.Context, marshaler runtime.Marshaler, server AuthServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq VerifyEmailRequest
-		metadata runtime.ServerMetadata
-	)
-	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+	var protoReq VerifyEmailRequest
+	var metadata runtime.ServerMetadata
+
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && err != io.EOF {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
+
 	msg, err := server.VerifyEmail(ctx, &protoReq)
 	return msg, metadata, err
+
 }
 
 func request_Auth_RestorePasswordBegin_0(ctx context.Context, marshaler runtime.Marshaler, client AuthClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq RestorePasswordBeginRequest
-		metadata runtime.ServerMetadata
-	)
-	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+	var protoReq RestorePasswordBeginRequest
+	var metadata runtime.ServerMetadata
+
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && err != io.EOF {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	if req.Body != nil {
-		_, _ = io.Copy(io.Discard, req.Body)
-	}
+
 	msg, err := client.RestorePasswordBegin(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
+
 }
 
 func local_request_Auth_RestorePasswordBegin_0(ctx context.Context, marshaler runtime.Marshaler, server AuthServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq RestorePasswordBeginRequest
-		metadata runtime.ServerMetadata
-	)
-	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+	var protoReq RestorePasswordBeginRequest
+	var metadata runtime.ServerMetadata
+
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && err != io.EOF {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
+
 	msg, err := server.RestorePasswordBegin(ctx, &protoReq)
 	return msg, metadata, err
+
 }
 
 func request_Auth_RestorePasswordComplete_0(ctx context.Context, marshaler runtime.Marshaler, client AuthClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq RestorePasswordCompleteRequest
-		metadata runtime.ServerMetadata
-	)
-	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+	var protoReq RestorePasswordCompleteRequest
+	var metadata runtime.ServerMetadata
+
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && err != io.EOF {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	if req.Body != nil {
-		_, _ = io.Copy(io.Discard, req.Body)
-	}
+
 	msg, err := client.RestorePasswordComplete(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
+
 }
 
 func local_request_Auth_RestorePasswordComplete_0(ctx context.Context, marshaler runtime.Marshaler, server AuthServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq RestorePasswordCompleteRequest
-		metadata runtime.ServerMetadata
-	)
-	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+	var protoReq RestorePasswordCompleteRequest
+	var metadata runtime.ServerMetadata
+
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && err != io.EOF {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
+
 	msg, err := server.RestorePasswordComplete(ctx, &protoReq)
 	return msg, metadata, err
+
 }
 
 // RegisterAuthHandlerServer registers the http handlers for service Auth to "mux".
 // UnaryRPC     :call AuthServer directly.
 // StreamingRPC :currently unsupported pending https://github.com/grpc/grpc-go/issues/906.
 // Note that using this registration option will cause many gRPC library features to stop working. Consider using RegisterAuthHandlerFromEndpoint instead.
-// GRPC interceptors will not work for this type of registration. To use interceptors, you must use the "runtime.WithMiddlewares" option in the "runtime.NewServeMux" call.
 func RegisterAuthHandlerServer(ctx context.Context, mux *runtime.ServeMux, server AuthServer) error {
-	mux.Handle(http.MethodPost, pattern_Auth_Register_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+
+	mux.Handle("POST", pattern_Auth_Register_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/auth.Auth/Register", runtime.WithHTTPPathPattern("/api/v1/auth/register"))
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/auth.Auth/Register", runtime.WithHTTPPathPattern("/api/v1/auth/register"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -275,15 +291,20 @@ func RegisterAuthHandlerServer(ctx context.Context, mux *runtime.ServeMux, serve
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
+
 		forward_Auth_Register_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
 	})
-	mux.Handle(http.MethodPost, pattern_Auth_Login_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+
+	mux.Handle("POST", pattern_Auth_Login_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/auth.Auth/Login", runtime.WithHTTPPathPattern("/api/v1/auth/login"))
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/auth.Auth/Login", runtime.WithHTTPPathPattern("/api/v1/auth/login"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -295,15 +316,20 @@ func RegisterAuthHandlerServer(ctx context.Context, mux *runtime.ServeMux, serve
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
+
 		forward_Auth_Login_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
 	})
-	mux.Handle(http.MethodPost, pattern_Auth_RefreshToken_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+
+	mux.Handle("POST", pattern_Auth_RefreshToken_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/auth.Auth/RefreshToken", runtime.WithHTTPPathPattern("/api/v1/auth/refresh"))
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/auth.Auth/RefreshToken", runtime.WithHTTPPathPattern("/api/v1/auth/refresh"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -315,15 +341,45 @@ func RegisterAuthHandlerServer(ctx context.Context, mux *runtime.ServeMux, serve
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
+
 		forward_Auth_RefreshToken_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
 	})
-	mux.Handle(http.MethodPost, pattern_Auth_ValidateToken_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+
+	mux.Handle("POST", pattern_Auth_Logout_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/auth.Auth/ValidateToken", runtime.WithHTTPPathPattern("/api/v1/auth/validate"))
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/auth.Auth/Logout", runtime.WithHTTPPathPattern("/api/v1/auth/logout"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_Auth_Logout_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+
+		forward_Auth_Logout_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
+	})
+
+	mux.Handle("POST", pattern_Auth_ValidateToken_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/auth.Auth/ValidateToken", runtime.WithHTTPPathPattern("/api/v1/auth/validate"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -335,15 +391,20 @@ func RegisterAuthHandlerServer(ctx context.Context, mux *runtime.ServeMux, serve
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
+
 		forward_Auth_ValidateToken_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
 	})
-	mux.Handle(http.MethodPost, pattern_Auth_ResendVerificationEmail_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+
+	mux.Handle("POST", pattern_Auth_ResendVerificationEmail_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/auth.Auth/ResendVerificationEmail", runtime.WithHTTPPathPattern("/api/v1/auth/sign-up/resend-email"))
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/auth.Auth/ResendVerificationEmail", runtime.WithHTTPPathPattern("/api/v1/auth/sign-up/resend-email"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -355,15 +416,20 @@ func RegisterAuthHandlerServer(ctx context.Context, mux *runtime.ServeMux, serve
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
+
 		forward_Auth_ResendVerificationEmail_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
 	})
-	mux.Handle(http.MethodPost, pattern_Auth_VerifyEmail_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+
+	mux.Handle("POST", pattern_Auth_VerifyEmail_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/auth.Auth/VerifyEmail", runtime.WithHTTPPathPattern("/api/v1/auth/sign-up/verify-email"))
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/auth.Auth/VerifyEmail", runtime.WithHTTPPathPattern("/api/v1/auth/sign-up/verify-email"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -375,15 +441,20 @@ func RegisterAuthHandlerServer(ctx context.Context, mux *runtime.ServeMux, serve
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
+
 		forward_Auth_VerifyEmail_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
 	})
-	mux.Handle(http.MethodPost, pattern_Auth_RestorePasswordBegin_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+
+	mux.Handle("POST", pattern_Auth_RestorePasswordBegin_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/auth.Auth/RestorePasswordBegin", runtime.WithHTTPPathPattern("/api/v1/auth/restore-password/begin"))
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/auth.Auth/RestorePasswordBegin", runtime.WithHTTPPathPattern("/api/v1/auth/restore-password/begin"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -395,15 +466,20 @@ func RegisterAuthHandlerServer(ctx context.Context, mux *runtime.ServeMux, serve
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
+
 		forward_Auth_RestorePasswordBegin_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
 	})
-	mux.Handle(http.MethodPost, pattern_Auth_RestorePasswordComplete_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+
+	mux.Handle("POST", pattern_Auth_RestorePasswordComplete_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/auth.Auth/RestorePasswordComplete", runtime.WithHTTPPathPattern("/api/v1/auth/restore-password/complete"))
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/auth.Auth/RestorePasswordComplete", runtime.WithHTTPPathPattern("/api/v1/auth/restore-password/complete"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -415,7 +491,9 @@ func RegisterAuthHandlerServer(ctx context.Context, mux *runtime.ServeMux, serve
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
+
 		forward_Auth_RestorePasswordComplete_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
 	})
 
 	return nil
@@ -424,24 +502,25 @@ func RegisterAuthHandlerServer(ctx context.Context, mux *runtime.ServeMux, serve
 // RegisterAuthHandlerFromEndpoint is same as RegisterAuthHandler but
 // automatically dials to "endpoint" and closes the connection when "ctx" gets done.
 func RegisterAuthHandlerFromEndpoint(ctx context.Context, mux *runtime.ServeMux, endpoint string, opts []grpc.DialOption) (err error) {
-	conn, err := grpc.NewClient(endpoint, opts...)
+	conn, err := grpc.DialContext(ctx, endpoint, opts...)
 	if err != nil {
 		return err
 	}
 	defer func() {
 		if err != nil {
 			if cerr := conn.Close(); cerr != nil {
-				grpclog.Errorf("Failed to close conn to %s: %v", endpoint, cerr)
+				grpclog.Infof("Failed to close conn to %s: %v", endpoint, cerr)
 			}
 			return
 		}
 		go func() {
 			<-ctx.Done()
 			if cerr := conn.Close(); cerr != nil {
-				grpclog.Errorf("Failed to close conn to %s: %v", endpoint, cerr)
+				grpclog.Infof("Failed to close conn to %s: %v", endpoint, cerr)
 			}
 		}()
 	}()
+
 	return RegisterAuthHandler(ctx, mux, conn)
 }
 
@@ -455,13 +534,16 @@ func RegisterAuthHandler(ctx context.Context, mux *runtime.ServeMux, conn *grpc.
 // to "mux". The handlers forward requests to the grpc endpoint over the given implementation of "AuthClient".
 // Note: the gRPC framework executes interceptors within the gRPC handler. If the passed in "AuthClient"
 // doesn't go through the normal gRPC flow (creating a gRPC client etc.) then it will be up to the passed in
-// "AuthClient" to call the correct interceptors. This client ignores the HTTP middlewares.
+// "AuthClient" to call the correct interceptors.
 func RegisterAuthHandlerClient(ctx context.Context, mux *runtime.ServeMux, client AuthClient) error {
-	mux.Handle(http.MethodPost, pattern_Auth_Register_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+
+	mux.Handle("POST", pattern_Auth_Register_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/auth.Auth/Register", runtime.WithHTTPPathPattern("/api/v1/auth/register"))
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/auth.Auth/Register", runtime.WithHTTPPathPattern("/api/v1/auth/register"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -472,13 +554,18 @@ func RegisterAuthHandlerClient(ctx context.Context, mux *runtime.ServeMux, clien
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
+
 		forward_Auth_Register_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
 	})
-	mux.Handle(http.MethodPost, pattern_Auth_Login_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+
+	mux.Handle("POST", pattern_Auth_Login_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/auth.Auth/Login", runtime.WithHTTPPathPattern("/api/v1/auth/login"))
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/auth.Auth/Login", runtime.WithHTTPPathPattern("/api/v1/auth/login"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -489,13 +576,18 @@ func RegisterAuthHandlerClient(ctx context.Context, mux *runtime.ServeMux, clien
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
+
 		forward_Auth_Login_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
 	})
-	mux.Handle(http.MethodPost, pattern_Auth_RefreshToken_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+
+	mux.Handle("POST", pattern_Auth_RefreshToken_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/auth.Auth/RefreshToken", runtime.WithHTTPPathPattern("/api/v1/auth/refresh"))
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/auth.Auth/RefreshToken", runtime.WithHTTPPathPattern("/api/v1/auth/refresh"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -506,13 +598,40 @@ func RegisterAuthHandlerClient(ctx context.Context, mux *runtime.ServeMux, clien
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
+
 		forward_Auth_RefreshToken_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
 	})
-	mux.Handle(http.MethodPost, pattern_Auth_ValidateToken_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+
+	mux.Handle("POST", pattern_Auth_Logout_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/auth.Auth/ValidateToken", runtime.WithHTTPPathPattern("/api/v1/auth/validate"))
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/auth.Auth/Logout", runtime.WithHTTPPathPattern("/api/v1/auth/logout"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_Auth_Logout_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+
+		forward_Auth_Logout_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
+	})
+
+	mux.Handle("POST", pattern_Auth_ValidateToken_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/auth.Auth/ValidateToken", runtime.WithHTTPPathPattern("/api/v1/auth/validate"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -523,13 +642,18 @@ func RegisterAuthHandlerClient(ctx context.Context, mux *runtime.ServeMux, clien
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
+
 		forward_Auth_ValidateToken_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
 	})
-	mux.Handle(http.MethodPost, pattern_Auth_ResendVerificationEmail_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+
+	mux.Handle("POST", pattern_Auth_ResendVerificationEmail_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/auth.Auth/ResendVerificationEmail", runtime.WithHTTPPathPattern("/api/v1/auth/sign-up/resend-email"))
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/auth.Auth/ResendVerificationEmail", runtime.WithHTTPPathPattern("/api/v1/auth/sign-up/resend-email"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -540,13 +664,18 @@ func RegisterAuthHandlerClient(ctx context.Context, mux *runtime.ServeMux, clien
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
+
 		forward_Auth_ResendVerificationEmail_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
 	})
-	mux.Handle(http.MethodPost, pattern_Auth_VerifyEmail_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+
+	mux.Handle("POST", pattern_Auth_VerifyEmail_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/auth.Auth/VerifyEmail", runtime.WithHTTPPathPattern("/api/v1/auth/sign-up/verify-email"))
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/auth.Auth/VerifyEmail", runtime.WithHTTPPathPattern("/api/v1/auth/sign-up/verify-email"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -557,13 +686,18 @@ func RegisterAuthHandlerClient(ctx context.Context, mux *runtime.ServeMux, clien
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
+
 		forward_Auth_VerifyEmail_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
 	})
-	mux.Handle(http.MethodPost, pattern_Auth_RestorePasswordBegin_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+
+	mux.Handle("POST", pattern_Auth_RestorePasswordBegin_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/auth.Auth/RestorePasswordBegin", runtime.WithHTTPPathPattern("/api/v1/auth/restore-password/begin"))
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/auth.Auth/RestorePasswordBegin", runtime.WithHTTPPathPattern("/api/v1/auth/restore-password/begin"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -574,13 +708,18 @@ func RegisterAuthHandlerClient(ctx context.Context, mux *runtime.ServeMux, clien
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
+
 		forward_Auth_RestorePasswordBegin_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
 	})
-	mux.Handle(http.MethodPost, pattern_Auth_RestorePasswordComplete_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+
+	mux.Handle("POST", pattern_Auth_RestorePasswordComplete_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/auth.Auth/RestorePasswordComplete", runtime.WithHTTPPathPattern("/api/v1/auth/restore-password/complete"))
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/auth.Auth/RestorePasswordComplete", runtime.WithHTTPPathPattern("/api/v1/auth/restore-password/complete"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -591,29 +730,50 @@ func RegisterAuthHandlerClient(ctx context.Context, mux *runtime.ServeMux, clien
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
+
 		forward_Auth_RestorePasswordComplete_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
 	})
+
 	return nil
 }
 
 var (
-	pattern_Auth_Register_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "v1", "auth", "register"}, ""))
-	pattern_Auth_Login_0                   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "v1", "auth", "login"}, ""))
-	pattern_Auth_RefreshToken_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "v1", "auth", "refresh"}, ""))
-	pattern_Auth_ValidateToken_0           = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "v1", "auth", "validate"}, ""))
+	pattern_Auth_Register_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "v1", "auth", "register"}, ""))
+
+	pattern_Auth_Login_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "v1", "auth", "login"}, ""))
+
+	pattern_Auth_RefreshToken_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "v1", "auth", "refresh"}, ""))
+
+	pattern_Auth_Logout_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "v1", "auth", "logout"}, ""))
+
+	pattern_Auth_ValidateToken_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "v1", "auth", "validate"}, ""))
+
 	pattern_Auth_ResendVerificationEmail_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 2, 4}, []string{"api", "v1", "auth", "sign-up", "resend-email"}, ""))
-	pattern_Auth_VerifyEmail_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 2, 4}, []string{"api", "v1", "auth", "sign-up", "verify-email"}, ""))
-	pattern_Auth_RestorePasswordBegin_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 2, 4}, []string{"api", "v1", "auth", "restore-password", "begin"}, ""))
+
+	pattern_Auth_VerifyEmail_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 2, 4}, []string{"api", "v1", "auth", "sign-up", "verify-email"}, ""))
+
+	pattern_Auth_RestorePasswordBegin_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 2, 4}, []string{"api", "v1", "auth", "restore-password", "begin"}, ""))
+
 	pattern_Auth_RestorePasswordComplete_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 2, 4}, []string{"api", "v1", "auth", "restore-password", "complete"}, ""))
 )
 
 var (
-	forward_Auth_Register_0                = runtime.ForwardResponseMessage
-	forward_Auth_Login_0                   = runtime.ForwardResponseMessage
-	forward_Auth_RefreshToken_0            = runtime.ForwardResponseMessage
-	forward_Auth_ValidateToken_0           = runtime.ForwardResponseMessage
+	forward_Auth_Register_0 = runtime.ForwardResponseMessage
+
+	forward_Auth_Login_0 = runtime.ForwardResponseMessage
+
+	forward_Auth_RefreshToken_0 = runtime.ForwardResponseMessage
+
+	forward_Auth_Logout_0 = runtime.ForwardResponseMessage
+
+	forward_Auth_ValidateToken_0 = runtime.ForwardResponseMessage
+
 	forward_Auth_ResendVerificationEmail_0 = runtime.ForwardResponseMessage
-	forward_Auth_VerifyEmail_0             = runtime.ForwardResponseMessage
-	forward_Auth_RestorePasswordBegin_0    = runtime.ForwardResponseMessage
+
+	forward_Auth_VerifyEmail_0 = runtime.ForwardResponseMessage
+
+	forward_Auth_RestorePasswordBegin_0 = runtime.ForwardResponseMessage
+
 	forward_Auth_RestorePasswordComplete_0 = runtime.ForwardResponseMessage
 )

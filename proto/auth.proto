@@ -28,6 +28,13 @@ service Auth {
       body: "*"
     };
   }
+
+  rpc Logout(LogoutRequest) returns (LogoutResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/logout"
+      body: "*"
+    };
+  }
   
   rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse) {
     option (google.api.http) = {
@@ -96,6 +103,14 @@ message RefreshTokenRequest {
 message RefreshTokenResponse {
   string access_token = 1;
   string refresh_token = 2;
+}
+
+message LogoutRequest {
+  string refresh_token = 1;
+}
+
+message LogoutResponse {
+  // Пустой ответ
 }
 
 message ValidateTokenRequest {

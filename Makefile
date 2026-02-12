@@ -10,6 +10,12 @@ proto-generate:
 		--go-grpc_out=gen/auth --go-grpc_opt=paths=source_relative \
 		--grpc-gateway_out=gen/auth --grpc-gateway_opt=paths=source_relative \
 		proto/auth.proto
+	protoc --proto_path=proto \
+		--proto_path=third_party \
+		--go_out=gen/user --go_opt=paths=source_relative \
+		--go-grpc_out=gen/user --go-grpc_opt=paths=source_relative \
+		--grpc-gateway_out=gen/user --grpc-gateway_opt=paths=source_relative \
+		proto/user.proto
 
 # Генерация секретного ключа (пока тестовое исполнение)
 generate-key:

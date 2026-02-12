@@ -190,6 +190,55 @@
         }
       }
     },
+    "/auth/logout": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Выход из системы",
+        "description": "Отзывает refresh токен и активные access токены пользователя, очищает cookies `access_token` и `refresh_token`.",
+        "operationId": "logout",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogoutRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Успешный выход. Cookies сброшены.",
+            "headers": {
+              "Set-Cookie": {
+                "description": "Пустые cookies для `access_token` и `refresh_token` (Max-Age=0)",
+                "schema": {
+                  "type": "string",
+                  "example": "access_token=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogoutResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Невалидный или отозванный refresh токен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/validate": {
       "post": {
         "tags": ["Auth"],
@@ -581,6 +630,59 @@
         }
       }
     },
+    "/auth/oauth/github/start": {
+      "get": {
+        "tags": ["OAuth2"],
+        "summary": "Старт привязки GitHub аккаунта",
+        "description": "Возвращает ссылку для редиректа на GitHub OAuth. Требует access token (cookie `access_token` или заголовок Authorization). После успешной авторизации редиректит пользователя обратно на исходную страницу и обновляет git_url профиля.",
+        "operationId": "oauthGitHubStart",
+        "parameters": [
+          {
+            "name": "redirect_url",
+            "in": "query",
+            "required": false,
+            "description": "URL для возврата после авторизации (по умолчанию из Referer/Origin или конфига)",
+            "schema": {
+              "type": "string",
+              "format": "uri",
+              "example": "http://localhost:5173/profile"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "URL для перенаправления пользователя на GitHub",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthGitHubStartResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Некорректный redirect_url или ошибка формирования ссылки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Необходим access token для привязки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/oauth/providers": {
       "get": {
         "tags": ["OAuth2"],
@@ -707,8 +809,28 @@
             "type": "string",
             "description": "Новый JWT access токен. Также устанавливается в cookie `access_token` (HttpOnly, 30 минут)",
             "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "Обновленный refresh токен (устанавливается в cookie `refresh_token`, 30 дней)",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
           }
         }
+      },
+      "LogoutRequest": {
+        "type": "object",
+        "required": ["refreshToken"],
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "Refresh токен активной сессии (можно передать из cookie)",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          }
+        }
+      },
+      "LogoutResponse": {
+        "type": "object",
+        "description": "Пустой ответ при успешном выходе"
       },
       "ValidateTokenRequest": {
         "type": "object",
@@ -848,6 +970,18 @@
             "items": {
               "$ref": "#/components/schemas/OAuthAuthUrlResponse"
             }
+          }
+        }
+      },
+      "OAuthGitHubStartResponse": {
+        "type": "object",
+        "required": ["redirect_url"],
+        "properties": {
+          "redirect_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL для редиректа на GitHub OAuth",
+            "example": "https://github.com/login/oauth/authorize?client_id=...&redirect_uri=...&scope=read:user%20user:email&state=abc123"
           }
         }
       }

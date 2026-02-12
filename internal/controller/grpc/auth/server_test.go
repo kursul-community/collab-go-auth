@@ -20,11 +20,12 @@ func TestRegister(t *testing.T) {
 		Password: "password123",
 	}
 
-	mockAuth.On("Register", req.Email, req.Password).Return("123", nil)
+	mockAuth.On("Register", req.Email, req.Password).Return("123", "req-1", nil)
 
 	res, err := server.Register(ctx, req)
 	require.NoError(t, err)
 	assert.Equal(t, "123", res.UserId)
+	assert.Equal(t, "req-1", res.RequestId)
 
 	mockAuth.AssertExpectations(t)
 }
@@ -124,10 +125,10 @@ func TestLogout(t *testing.T) {
 
 	ctx := context.Background()
 	req := &pb.LogoutRequest{
-		AccessToken: "accessToken12345",
+		RefreshToken: "refreshToken12345",
 	}
 
-	mockAuth.On("Logout", req.AccessToken).Return(nil)
+	mockAuth.On("Logout", req.RefreshToken).Return(nil)
 
 	res, err := server.Logout(ctx, req)
 	require.NoError(t, err)
