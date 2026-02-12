@@ -61,5 +61,4 @@ jobs:
           username: collab-user
           key: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
           script: |
-            # Для collab-go-auth используйте это имя:
-            sudo kubectl rollout restart deployment collab-go-auth -n collab
+            helm upgrade --install auth-service "$HOME/collab-k8s-infra-temp/charts/apps/auth-service" -n collab --atomic --timeout 300s --set image.tag=${{ github.sha }}

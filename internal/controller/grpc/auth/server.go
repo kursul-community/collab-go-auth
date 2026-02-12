@@ -14,6 +14,7 @@ import (
 	pb "go-auth/gen/auth"
 	usecase "go-auth/internal/usecase/auth"
 	"go-auth/pkg/validator"
+
 )
 
 var _ pb.AuthServer = (*AuthServer)(nil)
