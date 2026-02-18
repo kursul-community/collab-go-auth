@@ -28,7 +28,7 @@ import (
 const (
 	AccessTokenCookieName  = "access_token"
 	RefreshTokenCookieName = "refresh_token"
-	AccessTokenMaxAge      = 30 * 60        // 30 минут
+	AccessTokenMaxAge      = 86400    // 3 дня
 	RefreshTokenMaxAge     = 30 * 24 * 3600 // 30 дней
 )
 
