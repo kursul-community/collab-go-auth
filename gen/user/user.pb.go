@@ -470,6 +470,94 @@ func (x *GetProfileByIDRequest) GetUserId() string {
 	return ""
 }
 
+type UpdateGitURLRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	GitUrl        string                 `protobuf:"bytes,1,opt,name=git_url,json=gitUrl,proto3" json:"git_url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateGitURLRequest) Reset() {
+	*x = UpdateGitURLRequest{}
+	mi := &file_user_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateGitURLRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateGitURLRequest) ProtoMessage() {}
+
+func (x *UpdateGitURLRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_user_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateGitURLRequest.ProtoReflect.Descriptor instead.
+func (*UpdateGitURLRequest) Descriptor() ([]byte, []int) {
+	return file_user_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *UpdateGitURLRequest) GetGitUrl() string {
+	if x != nil {
+		return x.GitUrl
+	}
+	return ""
+}
+
+type UpdateGitURLResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateGitURLResponse) Reset() {
+	*x = UpdateGitURLResponse{}
+	mi := &file_user_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateGitURLResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateGitURLResponse) ProtoMessage() {}
+
+func (x *UpdateGitURLResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_user_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateGitURLResponse.ProtoReflect.Descriptor instead.
+func (*UpdateGitURLResponse) Descriptor() ([]byte, []int) {
+	return file_user_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *UpdateGitURLResponse) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
 type GetProfileResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Profile       *UserProfile           `protobuf:"bytes,1,opt,name=profile,proto3" json:"profile,omitempty"`
@@ -479,7 +567,7 @@ type GetProfileResponse struct {
 
 func (x *GetProfileResponse) Reset() {
 	*x = GetProfileResponse{}
-	mi := &file_user_proto_msgTypes[8]
+	mi := &file_user_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -491,7 +579,7 @@ func (x *GetProfileResponse) String() string {
 func (*GetProfileResponse) ProtoMessage() {}
 
 func (x *GetProfileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_user_proto_msgTypes[8]
+	mi := &file_user_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -504,7 +592,7 @@ func (x *GetProfileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetProfileResponse.ProtoReflect.Descriptor instead.
 func (*GetProfileResponse) Descriptor() ([]byte, []int) {
-	return file_user_proto_rawDescGZIP(), []int{8}
+	return file_user_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GetProfileResponse) GetProfile() *UserProfile {
@@ -522,7 +610,7 @@ type GetPositionsRequest struct {
 
 func (x *GetPositionsRequest) Reset() {
 	*x = GetPositionsRequest{}
-	mi := &file_user_proto_msgTypes[9]
+	mi := &file_user_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -534,7 +622,7 @@ func (x *GetPositionsRequest) String() string {
 func (*GetPositionsRequest) ProtoMessage() {}
 
 func (x *GetPositionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_user_proto_msgTypes[9]
+	mi := &file_user_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -547,7 +635,7 @@ func (x *GetPositionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPositionsRequest.ProtoReflect.Descriptor instead.
 func (*GetPositionsRequest) Descriptor() ([]byte, []int) {
-	return file_user_proto_rawDescGZIP(), []int{9}
+	return file_user_proto_rawDescGZIP(), []int{11}
 }
 
 type GetPositionsResponse struct {
@@ -559,7 +647,7 @@ type GetPositionsResponse struct {
 
 func (x *GetPositionsResponse) Reset() {
 	*x = GetPositionsResponse{}
-	mi := &file_user_proto_msgTypes[10]
+	mi := &file_user_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -571,7 +659,7 @@ func (x *GetPositionsResponse) String() string {
 func (*GetPositionsResponse) ProtoMessage() {}
 
 func (x *GetPositionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_user_proto_msgTypes[10]
+	mi := &file_user_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -584,7 +672,7 @@ func (x *GetPositionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPositionsResponse.ProtoReflect.Descriptor instead.
 func (*GetPositionsResponse) Descriptor() ([]byte, []int) {
-	return file_user_proto_rawDescGZIP(), []int{10}
+	return file_user_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetPositionsResponse) GetPositions() []string {
@@ -632,18 +720,23 @@ const file_user_proto_rawDesc = "" +
 	"\x11GetProfileRequest\x12\x1a\n" +
 	"\busername\x18\x01 \x01(\tR\busername\"0\n" +
 	"\x15GetProfileByIDRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\"A\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\".\n" +
+	"\x13UpdateGitURLRequest\x12\x17\n" +
+	"\agit_url\x18\x01 \x01(\tR\x06gitUrl\".\n" +
+	"\x14UpdateGitURLResponse\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\"A\n" +
 	"\x12GetProfileResponse\x12+\n" +
 	"\aprofile\x18\x01 \x01(\v2\x11.user.UserProfileR\aprofile\"\x15\n" +
 	"\x13GetPositionsRequest\"4\n" +
 	"\x14GetPositionsResponse\x12\x1c\n" +
-	"\tpositions\x18\x01 \x03(\tR\tpositions2\xc4\x04\n" +
+	"\tpositions\x18\x01 \x03(\tR\tpositions2\xb3\x05\n" +
 	"\vUserService\x12p\n" +
 	"\rCreateProfile\x12\x1a.user.UpdateProfileRequest\x1a\x1b.user.UpdateProfileResponse\"&\x82\xd3\xe4\x93\x02 :\x01*\"\x1b/api/v1/user/create-profile\x12^\n" +
 	"\fGetMyProfile\x12\x19.user.GetMyProfileRequest\x1a\x1a.user.GetMyProfileResponse\"\x17\x82\xd3\xe4\x93\x02\x11\x12\x0f/api/v1/user/me\x12\x84\x01\n" +
 	"\n" +
 	"GetProfile\x12\x17.user.GetProfileRequest\x1a\x18.user.GetProfileResponse\"C\x82\xd3\xe4\x93\x02=Z!\x12\x1f/api/v1/user/profile/{username}\x12\x18/user/profile/{username}\x12u\n" +
-	"\x0eGetProfileByID\x12\x1b.user.GetProfileByIDRequest\x1a\x18.user.GetProfileResponse\",\x82\xd3\xe4\x93\x02&\x12$/api/v1/user/profile-by-id/{user_id}\x12e\n" +
+	"\x0eGetProfileByID\x12\x1b.user.GetProfileByIDRequest\x1a\x18.user.GetProfileResponse\",\x82\xd3\xe4\x93\x02&\x12$/api/v1/user/profile-by-id/{user_id}\x12m\n" +
+	"\fUpdateGitURL\x12\x19.user.UpdateGitURLRequest\x1a\x1a.user.UpdateGitURLResponse\"&\x82\xd3\xe4\x93\x02 :\x01*\"\x1b/api/v1/user/update-git-url\x12e\n" +
 	"\fGetPositions\x12\x19.user.GetPositionsRequest\x1a\x1a.user.GetPositionsResponse\"\x1e\x82\xd3\xe4\x93\x02\x18\x12\x16/api/v1/user/positionsB\x1eZ\x1ccollab-user-service/gen/userb\x06proto3"
 
 var (
@@ -658,7 +751,7 @@ func file_user_proto_rawDescGZIP() []byte {
 	return file_user_proto_rawDescData
 }
 
-var file_user_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_user_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_user_proto_goTypes = []any{
 	(*Position)(nil),              // 0: user.Position
 	(*UserProfile)(nil),           // 1: user.UserProfile
@@ -668,9 +761,11 @@ var file_user_proto_goTypes = []any{
 	(*GetMyProfileResponse)(nil),  // 5: user.GetMyProfileResponse
 	(*GetProfileRequest)(nil),     // 6: user.GetProfileRequest
 	(*GetProfileByIDRequest)(nil), // 7: user.GetProfileByIDRequest
-	(*GetProfileResponse)(nil),    // 8: user.GetProfileResponse
-	(*GetPositionsRequest)(nil),   // 9: user.GetPositionsRequest
-	(*GetPositionsResponse)(nil),  // 10: user.GetPositionsResponse
+	(*UpdateGitURLRequest)(nil),   // 8: user.UpdateGitURLRequest
+	(*UpdateGitURLResponse)(nil),  // 9: user.UpdateGitURLResponse
+	(*GetProfileResponse)(nil),    // 10: user.GetProfileResponse
+	(*GetPositionsRequest)(nil),   // 11: user.GetPositionsRequest
+	(*GetPositionsResponse)(nil),  // 12: user.GetPositionsResponse
 }
 var file_user_proto_depIdxs = []int32{
 	1,  // 0: user.GetMyProfileResponse.profile:type_name -> user.UserProfile
@@ -679,14 +774,16 @@ var file_user_proto_depIdxs = []int32{
 	4,  // 3: user.UserService.GetMyProfile:input_type -> user.GetMyProfileRequest
 	6,  // 4: user.UserService.GetProfile:input_type -> user.GetProfileRequest
 	7,  // 5: user.UserService.GetProfileByID:input_type -> user.GetProfileByIDRequest
-	9,  // 6: user.UserService.GetPositions:input_type -> user.GetPositionsRequest
-	3,  // 7: user.UserService.CreateProfile:output_type -> user.UpdateProfileResponse
-	5,  // 8: user.UserService.GetMyProfile:output_type -> user.GetMyProfileResponse
-	8,  // 9: user.UserService.GetProfile:output_type -> user.GetProfileResponse
-	8,  // 10: user.UserService.GetProfileByID:output_type -> user.GetProfileResponse
-	10, // 11: user.UserService.GetPositions:output_type -> user.GetPositionsResponse
-	7,  // [7:12] is the sub-list for method output_type
-	2,  // [2:7] is the sub-list for method input_type
+	8,  // 6: user.UserService.UpdateGitURL:input_type -> user.UpdateGitURLRequest
+	11, // 7: user.UserService.GetPositions:input_type -> user.GetPositionsRequest
+	3,  // 8: user.UserService.CreateProfile:output_type -> user.UpdateProfileResponse
+	5,  // 9: user.UserService.GetMyProfile:output_type -> user.GetMyProfileResponse
+	10, // 10: user.UserService.GetProfile:output_type -> user.GetProfileResponse
+	10, // 11: user.UserService.GetProfileByID:output_type -> user.GetProfileResponse
+	9,  // 12: user.UserService.UpdateGitURL:output_type -> user.UpdateGitURLResponse
+	12, // 13: user.UserService.GetPositions:output_type -> user.GetPositionsResponse
+	8,  // [8:14] is the sub-list for method output_type
+	2,  // [2:8] is the sub-list for method input_type
 	2,  // [2:2] is the sub-list for extension type_name
 	2,  // [2:2] is the sub-list for extension extendee
 	0,  // [0:2] is the sub-list for field type_name
@@ -703,7 +800,7 @@ func file_user_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_user_proto_rawDesc), len(file_user_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -39,6 +39,13 @@ service UserService {
     };
   }
 
+  rpc UpdateGitURL(UpdateGitURLRequest) returns (UpdateGitURLResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/user/update-git-url"
+      body: "*"
+    };
+  }
+
   // Получить список доступных позиций
   rpc GetPositions(GetPositionsRequest) returns (GetPositionsResponse) {
     option (google.api.http) = {
@@ -88,6 +95,14 @@ message GetProfileRequest {
 
 message GetProfileByIDRequest {
   string user_id = 1;
+}
+
+message UpdateGitURLRequest {
+  string git_url = 1;
+}
+
+message UpdateGitURLResponse {
+  string status = 1;
 }
 
 message GetProfileResponse {
