@@ -142,6 +142,30 @@ jobs:
           docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:build ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ github.sha }}
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ github.sha }}
 
+  deploy-dev:
+    runs-on: ubuntu-latest
+    needs: push-sha
+    if: ${{ github.base_ref == 'dev' }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Upgrade Helm Chart (sha)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: **.**
+          username: collab-user
+          key: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
+          script: |
+            helm upgrade --install auth-service \
+              "$HOME/collab-k8s-infra-temp/charts/apps/auth-service" \
+              -n collab \
+              --atomic \
+              --timeout 900s \
+              --set image.tag=${{ github.sha }}
+
+            kubectl -n collab rollout restart deploy/collab-go-auth
+
   deploy-main:
     runs-on: ubuntu-latest
     needs: push-latest
