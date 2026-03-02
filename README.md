@@ -222,6 +222,13 @@ curl -X POST http://localhost:8080/api/v1/auth/refresh \
   -d '{"refresh_token": "YOUR_REFRESH_TOKEN"}'
 ```
 
+**Выход (logout):**
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/logout \
+  -H "Content-Type: application/json" \
+  -d '{"refresh_token": "YOUR_REFRESH_TOKEN"}'
+```
+
 ### Порты:
 
 - **gRPC**: `60051` (для внутренних сервисов)

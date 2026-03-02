@@ -48,18 +48,20 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: |
+            ghcr.io/kursul-community/collab-go-auth:latest
+            ghcr.io/kursul-community/collab-go-auth:${{ github.sha }}
           labels: ${{ steps.meta.outputs.labels }}
           # Кэширование для ускорения сборки
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Restart Kubernetes Deployment
+      - name: Upgrade Helm Chart
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: 45.132.177.32
           username: collab-user
           key: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
           script: |
-            # Для collab-go-auth используйте это имя:
-            sudo kubectl rollout restart deployment collab-go-auth -n collab
+            helm upgrade --install auth-service "$HOME/collab-k8s-infra-temp/charts/apps/auth-service" -n collab --atomic --timeout 900s --set image.tag=latest
+            kubectl -n collab rollout restart deploy/collab-go-auth

@@ -68,6 +68,8 @@ type AuthUseCase interface {
 	Login(email string, password string) (accessToken, refreshToken string, err error)
 	// RefreshToken - обновление токена
 	RefreshToken(refreshToken string) (accessToken, newRefreshToken string, err error)
+	// Logout - завершение сессии по refresh токену
+	Logout(refreshToken string) error
 	// ValidateToken - проверка токена
 	ValidateToken(accessToken string) (valid bool, err error)
 	// ResendVerificationEmail - повторная отправка кода верификации email
@@ -598,6 +600,39 @@ func (uc *auth) RefreshToken(refreshToken string) (string, string, error) {
 	_ = uc.tokenRepo.RevokeRefreshToken(ctx, userID, refreshToken)
 
 	return newAccessToken, newRefreshToken, nil
+}
+
+// Logout - завершение сессии: отзывает refresh токен и связанные access токены пользователя
+func (uc *auth) Logout(refreshToken string) error {
+	ctx := context.Background()
+
+	// Проверяем валидность JWT токена (подпись и срок действия)
+	isValid, err := uc.tokenService.ValidateToken(refreshToken)
+	if !isValid || err != nil {
+		return ErrInvalidRefreshToken
+	}
+
+	// Получаем userID из токена
+	userID, err := uc.tokenService.GetUserIDFromToken(refreshToken)
+	if err != nil {
+		return ErrInvalidRefreshToken
+	}
+
+	// Проверяем, что refresh токен существует в Redis (не был отозван)
+	exists, err := uc.tokenRepo.ValidateRefreshToken(ctx, userID, refreshToken)
+	if err != nil {
+		return fmt.Errorf("failed to validate refresh token: %w", err)
+	}
+	if !exists {
+		return ErrRefreshTokenNotFound
+	}
+
+	// Отзываем все токены пользователя (access + refresh) для полного выхода
+	if err := uc.tokenRepo.RevokeAllUserTokens(ctx, userID); err != nil {
+		return fmt.Errorf("failed to revoke user tokens: %w", err)
+	}
+
+	return nil
 }
 
 // ValidateToken - проверка access токена
