@@ -160,14 +160,28 @@ jobs:
             exit 1
           fi
 
+      - name: Prepare SSH key file (dev)
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY_DEV || secrets.SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p .tmp-ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' > .tmp-ssh/deploy_key
+          chmod 600 .tmp-ssh/deploy_key
+          ssh-keygen -lf .tmp-ssh/deploy_key
+
       - name: Upgrade Helm Chart (sha)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: 45.132.177.32
           username: collab-user
           port: 22
-          key: ${{ secrets.SSH_PRIVATE_KEY || secrets.SSH_PRIVATE_KEY }}
+          key_path: ./.tmp-ssh/deploy_key
           passphrase: ${{ secrets.SSH_PASSPHRASE_DEV || secrets.SSH_PASSPHRASE }}
+          debug: true
+          script_stop: true
           script: |
             helm upgrade --install auth-service \
               "$HOME/collab-k8s-infra-temp/charts/apps/auth-service" \
@@ -196,14 +210,28 @@ jobs:
             exit 1
           fi
 
+      - name: Prepare SSH key file (prod)
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY_PROD || secrets.SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p .tmp-ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' > .tmp-ssh/deploy_key
+          chmod 600 .tmp-ssh/deploy_key
+          ssh-keygen -lf .tmp-ssh/deploy_key
+
       - name: Upgrade Helm Chart (latest)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: 213.171.26.208
           username: collab-user
           port: 22
-          key: ${{ secrets.SSH_PRIVATE_KEY_PROD || secrets.SSH_PRIVATE_KEY }}
+          key_path: ./.tmp-ssh/deploy_key
           passphrase: ${{ secrets.SSH_PASSPHRASE_PROD || secrets.SSH_PASSPHRASE }}
+          debug: true
+          script_stop: true
           script: |
             helm upgrade --install auth-service "$HOME/collab-k8s-infra-temp/charts/apps/auth-service" -n collab --atomic --timeout 900s --set image.tag=latest
             kubectl -n collab rollout restart deploy/collab-go-auth
