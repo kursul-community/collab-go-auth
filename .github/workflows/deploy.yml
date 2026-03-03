@@ -9,10 +9,10 @@ on:
 env:
   REGISTRY: ghcr.io
   # Имя образа в нижнем регистре
-  IMAGE_NAME: ${{ github.repository }} 
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build-and-push:
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
