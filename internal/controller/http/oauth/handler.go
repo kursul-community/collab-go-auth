@@ -44,7 +44,7 @@ func (h *Handler) GetAuthURL(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("OAuth: GetAuthURL request for provider: %s", provider)
 
-	// Пытаемся получить frontendURL из заголовка Origin или Referer, 
+	// Пытаемся получить frontendURL из заголовка Origin или Referer,
 	// чтобы редирект был на правильный сайт
 	frontendURL := r.Header.Get("Origin")
 	if frontendURL == "" {
@@ -56,7 +56,7 @@ func (h *Handler) GetAuthURL(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Если мы получили Origin (например, http://localhost:5173), 
+	// Если мы получили Origin (например, http://localhost:5173),
 	// добавляем путь для callback, если его нет
 	if frontendURL != "" {
 		// Извлекаем путь из конфига (например, /auth/callback)
@@ -84,6 +84,51 @@ func (h *Handler) GetAuthURL(w http.ResponseWriter, r *http.Request) {
 		"displayName": provider,
 		"auth_url":    authURL,
 		"state":       state,
+	})
+}
+
+// GetGitHubStart обрабатывает GET /api/v1/auth/oauth/github/start
+// Возвращает URL для редиректа на GitHub OAuth для привязки аккаунта
+func (h *Handler) GetGitHubStart(w http.ResponseWriter, r *http.Request) {
+	if h.oauth == nil {
+		writeError(w, http.StatusServiceUnavailable, "OAuth is not configured")
+		return
+	}
+
+	redirectURL := r.URL.Query().Get("redirect_url")
+	if redirectURL == "" {
+		redirectURL = r.URL.Query().Get("redirectUrl")
+	}
+	if redirectURL == "" {
+		redirectURL = r.Header.Get("Referer")
+	}
+	if redirectURL == "" {
+		redirectURL = r.Header.Get("Origin")
+	}
+	if redirectURL == "" {
+		redirectURL = h.frontendURL
+	}
+
+	if _, err := url.Parse(redirectURL); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid redirect_url")
+		return
+	}
+
+	accessToken := extractAccessToken(r)
+	if accessToken == "" {
+		writeError(w, http.StatusUnauthorized, "access token required")
+		return
+	}
+
+	authURL, _, err := h.oauth.GetAuthURLForGitHubLink(redirectURL, accessToken)
+	if err != nil {
+		log.Printf("OAuth: GetGitHubStart error: %v", err)
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"redirect_url": authURL,
 	})
 }
 
@@ -127,7 +172,7 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Обрабатываем callback
-	accessToken, refreshToken, redirectURL, err := h.oauth.HandleCallback(provider, code, state)
+	accessToken, refreshToken, redirectURL, issueTokens, err := h.oauth.HandleCallback(provider, code, state)
 	if err != nil {
 		log.Printf("OAuth: Callback error: %v", err)
 		redirectWithError(w, r, h.frontendURL, "auth_failed", err.Error())
@@ -140,8 +185,14 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 		finalFrontendURL = redirectURL
 	}
 
-	// Редиректим на фронтенд с токенами
-	h.redirectWithTokens(w, r, finalFrontendURL, accessToken, refreshToken)
+	if issueTokens {
+		// Редиректим на фронтенд с токенами
+		h.redirectWithTokens(w, r, finalFrontendURL, accessToken, refreshToken)
+		return
+	}
+
+	log.Printf("OAuth: Redirecting to frontend without tokens")
+	http.Redirect(w, r, finalFrontendURL, http.StatusFound)
 }
 
 // GetProviders обрабатывает GET /api/v1/auth/oauth/providers
@@ -291,4 +342,20 @@ func writeError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, map[string]string{
 		"error": message,
 	})
+}
+
+func extractAccessToken(r *http.Request) string {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader != "" {
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) == 2 && strings.EqualFold(parts[0], "bearer") && parts[1] != "" {
+			return parts[1]
+		}
+	}
+
+	if cookie, err := r.Cookie(accessTokenCookieName); err == nil && cookie.Value != "" {
+		return cookie.Value
+	}
+
+	return ""
 }
