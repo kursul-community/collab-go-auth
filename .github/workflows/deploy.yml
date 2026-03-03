@@ -145,18 +145,29 @@ jobs:
   deploy-dev:
     runs-on: ubuntu-latest
     needs: push-sha
-    if: ${{ github.base_ref == 'dev' }}
+    # Secrets are not available to workflows triggered from forked PRs.
+    if: ${{ github.base_ref == 'dev' && github.event.pull_request.head.repo.full_name == github.repository }}
     environment: dev
     permissions:
       contents: read
 
     steps:
+      - name: Validate SSH key secret (dev)
+        shell: bash
+        run: |
+          if [ -z "${{ secrets.SSH_PRIVATE_KEY_DEV || secrets.SSH_PRIVATE_KEY }}" ]; then
+            echo "Missing SSH private key secret for environment 'dev' (SSH_PRIVATE_KEY_DEV or SSH_PRIVATE_KEY)."
+            exit 1
+          fi
+
       - name: Upgrade Helm Chart (sha)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: 45.132.177.32
           username: collab-user
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          key: ${{ secrets.SSH_PRIVATE_KEY || secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE_DEV || secrets.SSH_PASSPHRASE }}
           script: |
             helm upgrade --install auth-service \
               "$HOME/collab-k8s-infra-temp/charts/apps/auth-service" \
@@ -170,18 +181,29 @@ jobs:
   deploy-main:
     runs-on: ubuntu-latest
     needs: push-latest
-    if: ${{ github.base_ref == 'main' }}
+    # Secrets are not available to workflows triggered from forked PRs.
+    if: ${{ github.base_ref == 'main' && github.event.pull_request.head.repo.full_name == github.repository }}
     environment: prod
     permissions:
       contents: read
 
     steps:
+      - name: Validate SSH key secret (prod)
+        shell: bash
+        run: |
+          if [ -z "${{ secrets.SSH_PRIVATE_KEY_PROD || secrets.SSH_PRIVATE_KEY }}" ]; then
+            echo "Missing SSH private key secret for environment 'prod' (SSH_PRIVATE_KEY_PROD or SSH_PRIVATE_KEY)."
+            exit 1
+          fi
+
       - name: Upgrade Helm Chart (latest)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: 213.171.26.208
           username: collab-user
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          key: ${{ secrets.SSH_PRIVATE_KEY_PROD || secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE_PROD || secrets.SSH_PASSPHRASE }}
           script: |
             helm upgrade --install auth-service "$HOME/collab-k8s-infra-temp/charts/apps/auth-service" -n collab --atomic --timeout 900s --set image.tag=latest
             kubectl -n collab rollout restart deploy/collab-go-auth
