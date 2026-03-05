@@ -52,29 +52,36 @@ func (c *client) ProfileExists(ctx context.Context, userID string) (bool, error)
 	return true, nil
 }
 
+// func (c *client) UpdateGitURL(ctx context.Context, userID, gitURL, accessToken string) error {
+// 	if accessToken != "" {
+// 		ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+accessToken)
+// 	}
+
+// 	profileResp, err := c.userClient.GetProfileByID(ctx, &pb.GetProfileByIDRequest{UserId: userID})
+// 	if err != nil {
+// 		return err
+// 	}
+// 	profile := profileResp.GetProfile()
+// 	if profile == nil || profile.GetUsername() == "" {
+// 		return status.Error(codes.InvalidArgument, "username is required")
+// 	}
+// 	if profile.GetPosition() == "" {
+// 		return status.Error(codes.InvalidArgument, "position is required")
+// 	}
+
+//		_, err = c.userClient.CreateProfile(ctx, &pb.UpdateProfileRequest{
+//			UserId:    userID,
+//			Username:  profile.GetUsername(),
+//			AboutInfo: profile.GetAboutInfo(),
+//			Position:  profile.GetPosition(),
+//			GitUrl:    gitURL,
+//		})
+//		return err
+//	}
 func (c *client) UpdateGitURL(ctx context.Context, userID, gitURL, accessToken string) error {
 	if accessToken != "" {
 		ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+accessToken)
 	}
-
-	profileResp, err := c.userClient.GetProfileByID(ctx, &pb.GetProfileByIDRequest{UserId: userID})
-	if err != nil {
-		return err
-	}
-	profile := profileResp.GetProfile()
-	if profile == nil || profile.GetUsername() == "" {
-		return status.Error(codes.InvalidArgument, "username is required")
-	}
-	if profile.GetPosition() == "" {
-		return status.Error(codes.InvalidArgument, "position is required")
-	}
-
-	_, err = c.userClient.CreateProfile(ctx, &pb.UpdateProfileRequest{
-		UserId:    userID,
-		Username:  profile.GetUsername(),
-		AboutInfo: profile.GetAboutInfo(),
-		Position:  profile.GetPosition(),
-		GitUrl:    gitURL,
-	})
+	_, err := c.userClient.UpdateGitURL(ctx, &pb.UpdateGitURLRequest{GitUrl: gitURL})
 	return err
 }

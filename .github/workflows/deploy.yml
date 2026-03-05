@@ -3,15 +3,16 @@ name: Build and Deploy (K8s)
 on:
   pull_request:
     branches:
+      - dev
       - main
 
 env:
   REGISTRY: ghcr.io
   # Имя образа в нижнем регистре
-  IMAGE_NAME: ${{ github.repository }} 
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build-and-push:
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -43,25 +44,166 @@ jobs:
           tags: |
             type=raw,value=latest
 
-      - name: Build and push
+      # - name: Build and push
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: .
+      #     push: true
+      #     tags: |
+      #       ghcr.io/kursul-community/collab-go-auth:latest
+      #       ghcr.io/kursul-community/collab-go-auth:${{ github.sha }}
+      #     labels: ${{ steps.meta.outputs.labels }}
+      #     # Кэширование для ускорения сборки
+      #     cache-from: type=gha
+      #     cache-to: type=gha,mode=max
+
+      - name: Build Image and export to tar
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: true
-          tags: |
-            ghcr.io/kursul-community/collab-go-auth:latest
-            ghcr.io/kursul-community/collab-go-auth:${{ github.sha }}
-          labels: ${{ steps.meta.outputs.labels }}
-          # Кэширование для ускорения сборки
+          push: false
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:build
+          outputs: type=docker,dest=/tmp/image.tar
           cache-from: type=gha
           cache-to: type=gha,mode=max
+        
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with: 
+          name: docker-image
+          path: /tmp/image.tar
+          retention-days: 1        
+  
+  push-sha:
+    runs-on: ubuntu-latest
+    needs: build
+    if: ${{ github.base_ref == 'dev' }}
+    permissions:
+      contents: read
+      packages: write
 
-      - name: Restart Kubernetes Deployment
+    steps:
+      - name: Lowercase image name
+        run: |
+          echo "IMAGE_NAME_LOWER=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp
+
+      - name: Load image
+        run: docker load -i /tmp/image.tar
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag and push sha
+        run: |
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:build ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ github.sha }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ github.sha }}
+
+  push-latest:
+    runs-on: ubuntu-latest
+    needs: build
+    if: ${{ github.base_ref == 'main' }}
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Lowercase image name
+        run: |
+          echo "IMAGE_NAME_LOWER=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp
+
+      - name: Load image
+        run: docker load -i /tmp/image.tar
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag and push latest
+        run: |
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:build ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest
+
+  deploy-dev:
+    runs-on: ubuntu-latest
+    needs: push-sha
+    # Secrets are not available to workflows triggered from forked PRs.
+    if: ${{ github.base_ref == 'dev' && github.event.pull_request.head.repo.full_name == github.repository }}
+    environment: dev
+    permissions:
+      contents: read
+
+    steps:
+      - name: Validate SSH key secret (dev)
+        shell: bash
+        run: |
+          if [ -z "${{ secrets.SSH_PRIVATE_KEY_DEV || secrets.SSH_PRIVATE_KEY }}" ]; then
+            echo "Missing SSH private key secret for environment 'dev' (SSH_PRIVATE_KEY_DEV or SSH_PRIVATE_KEY)."
+            exit 1
+          fi
+
+      - name: Upgrade Helm Chart (sha)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: 45.132.177.32
           username: collab-user
-          key: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
+          port: 22
+          key: ${{ secrets.SSH_PRIVATE_KEY || secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE_DEV || secrets.SSH_PASSPHRASE }}
           script: |
-            helm upgrade --install auth-service "$HOME/collab-k8s-infra-temp/charts/apps/auth-service" -n collab --atomic --timeout 900s --set image.tag=${{ github.sha }}
-            kubectl -n collab rollout status deploy/collab-go-auth --timeout=300s
+            helm upgrade --install auth-service \
+              "$HOME/collab-k8s-infra-temp/charts/apps/auth-service" \
+              -n collab \
+              --atomic \
+              --timeout 900s \
+              --set image.tag=${{ github.sha }}
+
+            kubectl -n collab rollout restart deploy/collab-go-auth
+
+  deploy-main:
+    runs-on: ubuntu-latest
+    needs: push-latest
+    # Secrets are not available to workflows triggered from forked PRs.
+    if: ${{ github.base_ref == 'main' && github.event.pull_request.head.repo.full_name == github.repository }}
+    environment: prod
+    permissions:
+      contents: read
+
+    steps:
+      - name: Validate SSH key secret (prod)
+        shell: bash
+        run: |
+          if [ -z "${{ secrets.SSH_PRIVATE_KEY_PROD || secrets.SSH_PRIVATE_KEY }}" ]; then
+            echo "Missing SSH private key secret for environment 'prod' (SSH_PRIVATE_KEY_PROD or SSH_PRIVATE_KEY)."
+            exit 1
+          fi
+
+      - name: Upgrade Helm Chart (latest)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 213.171.26.208
+          username: collab-user
+          port: 22
+          key: ${{ secrets.SSH_PRIVATE_KEY_PROD || secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE_PROD || secrets.SSH_PASSPHRASE }}
+          script: |
+            helm upgrade --install auth-service "$HOME/collab-k8s-infra-temp/charts/apps/auth-service" -n collab --atomic --timeout 900s --set image.tag=latest
+            kubectl -n collab rollout restart deploy/collab-go-auth

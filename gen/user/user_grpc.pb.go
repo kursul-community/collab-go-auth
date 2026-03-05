@@ -23,6 +23,7 @@ const (
 	UserService_GetMyProfile_FullMethodName   = "/user.UserService/GetMyProfile"
 	UserService_GetProfile_FullMethodName     = "/user.UserService/GetProfile"
 	UserService_GetProfileByID_FullMethodName = "/user.UserService/GetProfileByID"
+	UserService_UpdateGitURL_FullMethodName   = "/user.UserService/UpdateGitURL"
 	UserService_GetPositions_FullMethodName   = "/user.UserService/GetPositions"
 )
 
@@ -38,6 +39,7 @@ type UserServiceClient interface {
 	GetProfile(ctx context.Context, in *GetProfileRequest, opts ...grpc.CallOption) (*GetProfileResponse, error)
 	// Получить профиль пользователя по user_id
 	GetProfileByID(ctx context.Context, in *GetProfileByIDRequest, opts ...grpc.CallOption) (*GetProfileResponse, error)
+	UpdateGitURL(ctx context.Context, in *UpdateGitURLRequest, opts ...grpc.CallOption) (*UpdateGitURLResponse, error)
 	// Получить список доступных позиций
 	GetPositions(ctx context.Context, in *GetPositionsRequest, opts ...grpc.CallOption) (*GetPositionsResponse, error)
 }
@@ -90,6 +92,16 @@ func (c *userServiceClient) GetProfileByID(ctx context.Context, in *GetProfileBy
 	return out, nil
 }
 
+func (c *userServiceClient) UpdateGitURL(ctx context.Context, in *UpdateGitURLRequest, opts ...grpc.CallOption) (*UpdateGitURLResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateGitURLResponse)
+	err := c.cc.Invoke(ctx, UserService_UpdateGitURL_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *userServiceClient) GetPositions(ctx context.Context, in *GetPositionsRequest, opts ...grpc.CallOption) (*GetPositionsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetPositionsResponse)
@@ -112,6 +124,7 @@ type UserServiceServer interface {
 	GetProfile(context.Context, *GetProfileRequest) (*GetProfileResponse, error)
 	// Получить профиль пользователя по user_id
 	GetProfileByID(context.Context, *GetProfileByIDRequest) (*GetProfileResponse, error)
+	UpdateGitURL(context.Context, *UpdateGitURLRequest) (*UpdateGitURLResponse, error)
 	// Получить список доступных позиций
 	GetPositions(context.Context, *GetPositionsRequest) (*GetPositionsResponse, error)
 	mustEmbedUnimplementedUserServiceServer()
@@ -135,6 +148,9 @@ func (UnimplementedUserServiceServer) GetProfile(context.Context, *GetProfileReq
 }
 func (UnimplementedUserServiceServer) GetProfileByID(context.Context, *GetProfileByIDRequest) (*GetProfileResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetProfileByID not implemented")
+}
+func (UnimplementedUserServiceServer) UpdateGitURL(context.Context, *UpdateGitURLRequest) (*UpdateGitURLResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateGitURL not implemented")
 }
 func (UnimplementedUserServiceServer) GetPositions(context.Context, *GetPositionsRequest) (*GetPositionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetPositions not implemented")
@@ -232,6 +248,24 @@ func _UserService_GetProfileByID_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UserService_UpdateGitURL_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateGitURLRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).UpdateGitURL(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_UpdateGitURL_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).UpdateGitURL(ctx, req.(*UpdateGitURLRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _UserService_GetPositions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetPositionsRequest)
 	if err := dec(in); err != nil {
@@ -272,6 +306,10 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetProfileByID",
 			Handler:    _UserService_GetProfileByID_Handler,
+		},
+		{
+			MethodName: "UpdateGitURL",
+			Handler:    _UserService_UpdateGitURL_Handler,
 		},
 		{
 			MethodName: "GetPositions",
