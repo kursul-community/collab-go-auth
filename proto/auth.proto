@@ -74,6 +74,14 @@ service Auth {
       body: "*"
     };
   }
+
+  // === Admin-only RPCs (internal, no HTTP gateway) ===
+
+  // Смена пароля пользователя по user_id (для админ-панели)
+  rpc AdminChangePassword(AdminChangePasswordRequest) returns (AdminChangePasswordResponse);
+
+  // Удаление пользователя по user_id (для админ-панели)
+  rpc AdminDeleteUser(AdminDeleteUserRequest) returns (AdminDeleteUserResponse);
 }
 
 message RegisterRequest {
@@ -163,3 +171,18 @@ message RestorePasswordCompleteRequest {
 message RestorePasswordCompleteResponse {
   // Пустой ответ при успехе
 }
+
+// === Admin RPCs ===
+
+message AdminChangePasswordRequest {
+  string user_id = 1;
+  string new_password = 2;
+}
+
+message AdminChangePasswordResponse {}
+
+message AdminDeleteUserRequest {
+  string user_id = 1;
+}
+
+message AdminDeleteUserResponse {}

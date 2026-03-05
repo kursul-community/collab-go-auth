@@ -80,6 +80,10 @@ type AuthUseCase interface {
 	RestorePasswordBegin(email string, frontendURL string) error
 	// RestorePasswordComplete - завершение восстановления пароля
 	RestorePasswordComplete(userID string, requestID string, newPassword string) error
+	// AdminChangePassword - смена пароля администратором (без requestID)
+	AdminChangePassword(userID string, newPassword string) error
+	// AdminDeleteUser - удаление пользователя администратором
+	AdminDeleteUser(userID string) error
 }
 
 // Auth - структура для аутентификации
@@ -630,6 +634,54 @@ func (uc *auth) Logout(refreshToken string) error {
 	// Отзываем все токены пользователя (access + refresh) для полного выхода
 	if err := uc.tokenRepo.RevokeAllUserTokens(ctx, userID); err != nil {
 		return fmt.Errorf("failed to revoke user tokens: %w", err)
+	}
+
+	return nil
+}
+
+// AdminChangePassword - смена пароля пользователя администратором (без requestID)
+func (uc *auth) AdminChangePassword(userID string, newPassword string) error {
+	ctx := context.Background()
+
+	if len(newPassword) < 6 || len(newPassword) > 128 {
+		return ErrMinLengthPswd
+	}
+
+	curUser, err := uc.userRepo.GetUserById(ctx, userID)
+	if err != nil || curUser == nil {
+		return ErrUserNotFound
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	if err := uc.userRepo.UpdatePassword(ctx, userID, string(hashedPassword)); err != nil {
+		return fmt.Errorf("failed to update password: %w", err)
+	}
+
+	// Отзываем все токены пользователя после смены пароля
+	uc.tokenRepo.RevokeAllUserTokens(ctx, userID)
+
+	return nil
+}
+
+// AdminDeleteUser - удаление пользователя администратором
+func (uc *auth) AdminDeleteUser(userID string) error {
+	ctx := context.Background()
+
+	curUser, err := uc.userRepo.GetUserById(ctx, userID)
+	if err != nil || curUser == nil {
+		return ErrUserNotFound
+	}
+
+	// Отзываем все токены
+	uc.tokenRepo.RevokeAllUserTokens(ctx, userID)
+
+	// Удаляем пользователя из БД
+	if err := uc.userRepo.DeleteUser(ctx, userID); err != nil {
+		return fmt.Errorf("failed to delete user: %w", err)
 	}
 
 	return nil

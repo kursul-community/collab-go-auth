@@ -28,6 +28,8 @@ type Repository interface {
 	CreateOAuthUser(ctx context.Context, user *entity.User) (string, error)
 	// LinkOAuthProvider - привязка OAuth провайдера к существующему пользователю
 	LinkOAuthProvider(ctx context.Context, userID, provider, providerID string) error
+	// DeleteUser - удаление пользователя по ID
+	DeleteUser(ctx context.Context, userID string) error
 }
 
 // repository - репозиторий для работы с PostgreSQL
@@ -133,5 +135,12 @@ func (r *repository) CreateOAuthUser(ctx context.Context, user *entity.User) (st
 func (r *repository) LinkOAuthProvider(ctx context.Context, userID, provider, providerID string) error {
 	query := `UPDATE users SET oauth_provider = $1, oauth_provider_id = $2 WHERE id = $3`
 	_, err := r.db.Exec(ctx, query, provider, providerID, userID)
+	return err
+}
+
+// DeleteUser - удаление пользователя по ID
+func (r *repository) DeleteUser(ctx context.Context, userID string) error {
+	query := `DELETE FROM users WHERE id = $1`
+	_, err := r.db.Exec(ctx, query, userID)
 	return err
 }

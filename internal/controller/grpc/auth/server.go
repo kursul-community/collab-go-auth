@@ -14,7 +14,6 @@ import (
 	pb "go-auth/gen/auth"
 	usecase "go-auth/internal/usecase/auth"
 	"go-auth/pkg/validator"
-
 )
 
 var _ pb.AuthServer = (*AuthServer)(nil)
@@ -312,4 +311,44 @@ func (s *AuthServer) RestorePasswordComplete(ctx context.Context, req *pb.Restor
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	return &pb.RestorePasswordCompleteResponse{}, nil
+}
+
+// AdminChangePassword - смена пароля пользователя администратором
+func (s *AuthServer) AdminChangePassword(ctx context.Context, req *pb.AdminChangePasswordRequest) (*pb.AdminChangePasswordResponse, error) {
+	if req.UserId == "" {
+		return nil, status.Error(codes.InvalidArgument, "user_id is required")
+	}
+	if req.NewPassword == "" {
+		return nil, status.Error(codes.InvalidArgument, "new_password is required")
+	}
+
+	err := s.auth.AdminChangePassword(req.UserId, req.NewPassword)
+	if err != nil {
+		if errors.Is(err, usecase.ErrUserNotFound) {
+			return nil, status.Error(codes.NotFound, err.Error())
+		}
+		if errors.Is(err, usecase.ErrMinLengthPswd) {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return &pb.AdminChangePasswordResponse{}, nil
+}
+
+// AdminDeleteUser - удаление пользователя администратором
+func (s *AuthServer) AdminDeleteUser(ctx context.Context, req *pb.AdminDeleteUserRequest) (*pb.AdminDeleteUserResponse, error) {
+	if req.UserId == "" {
+		return nil, status.Error(codes.InvalidArgument, "user_id is required")
+	}
+
+	err := s.auth.AdminDeleteUser(req.UserId)
+	if err != nil {
+		if errors.Is(err, usecase.ErrUserNotFound) {
+			return nil, status.Error(codes.NotFound, err.Error())
+		}
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return &pb.AdminDeleteUserResponse{}, nil
 }
