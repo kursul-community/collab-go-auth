@@ -16,6 +16,7 @@ import (
 type Client interface {
 	ProfileExists(ctx context.Context, userID string) (bool, error)
 	UpdateGitURL(ctx context.Context, userID, gitURL, accessToken string) error
+	GetUserStatus(ctx context.Context, userID string) (status string, bannedAt string, err error)
 }
 
 type client struct {
@@ -84,4 +85,12 @@ func (c *client) UpdateGitURL(ctx context.Context, userID, gitURL, accessToken s
 	}
 	_, err := c.userClient.UpdateGitURL(ctx, &pb.UpdateGitURLRequest{GitUrl: gitURL})
 	return err
+}
+
+func (c *client) GetUserStatus(ctx context.Context, userID string) (string, string, error) {
+	resp, err := c.userClient.GetUserStatus(ctx, &pb.GetUserStatusRequest{UserId: userID})
+	if err != nil {
+		return "", "", err
+	}
+	return resp.GetStatus(), resp.GetBannedAt(), nil
 }

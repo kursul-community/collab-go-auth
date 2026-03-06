@@ -52,6 +52,9 @@ service UserService {
       get: "/api/v1/user/positions"
     };
   }
+
+  // Получить статус пользователя (internal, для ban check)
+  rpc GetUserStatus(GetUserStatusRequest) returns (GetUserStatusResponse);
 }
 
 message Position {
@@ -113,4 +116,14 @@ message GetPositionsRequest {}
 
 message GetPositionsResponse {
   repeated string positions = 1;
+}
+
+// GetUserStatus messages (internal, for ban check)
+message GetUserStatusRequest {
+  string user_id = 1;
+}
+
+message GetUserStatusResponse {
+  string status = 1;    // "active" or "banned"
+  string banned_at = 2; // RFC3339 timestamp, empty if not banned
 }

@@ -18,6 +18,7 @@ import (
 	redisadapter "go-auth/internal/adapter/redis"
 	"go-auth/internal/adapter/token"
 	userclient "go-auth/internal/adapter/user"
+	"go-auth/internal/app/subscriber"
 	grpcauth "go-auth/internal/controller/grpc/auth"
 	oauthhttp "go-auth/internal/controller/http/oauth"
 	tokenrepo "go-auth/internal/repo/token"
@@ -72,6 +73,11 @@ func Run(cfg *config.Config, devMode bool) {
 	}
 	logger.Printf("User service client initialized (addr: %s)", cfg.Services.UserService)
 
+	// Инициализация ban cache и subscriber для блокировки забаненных пользователей
+	banCache := redisadapter.NewBanCache(redisClient)
+	subscriber.StartBanSubscriber(ctx, redisClient, banCache)
+	logger.Printf("Ban subscriber started, listening on Redis pub/sub channel 'user:banned'")
+
 	// Создаем слой usecase с TTL параметрами
 	authUseCase := usecase.NewAuthUseCase(
 		userRepo,
@@ -122,7 +128,7 @@ func Run(cfg *config.Config, devMode bool) {
 	}
 
 	logger.Printf("Starting gRPC server on port %d\n", cfg.GRPC.Port)
-	
+
 	// Запускаем gRPC-сервер в горутине
 	go func() {
 		if err := grpcServer.Serve(lis); err != nil {
@@ -131,7 +137,7 @@ func Run(cfg *config.Config, devMode bool) {
 	}()
 
 	// Запускаем HTTP Gateway для REST API
-	if err := RunGateway(cfg, oauthHandler); err != nil {
+	if err := RunGateway(cfg, oauthHandler, tokenSvc, banCache, userSvcClient); err != nil {
 		logger.Fatalf("Failed to serve HTTP Gateway: %v", err)
 	}
 }
