@@ -53,6 +53,9 @@ service UserService {
     };
   }
 
+  // Синхронизация пользователя из auth-service при регистрации
+  rpc SyncAuthUser(SyncAuthUserRequest) returns (SyncAuthUserResponse);
+
   // Получить статус пользователя (internal, для ban check)
   rpc GetUserStatus(GetUserStatusRequest) returns (GetUserStatusResponse);
 }
@@ -80,6 +83,7 @@ message UpdateProfileRequest {
   string about_info = 3;
   string git_url = 4;
   string position = 5;
+  string email = 6;
 }
 
 message UpdateProfileResponse {
@@ -116,6 +120,15 @@ message GetPositionsRequest {}
 
 message GetPositionsResponse {
   repeated string positions = 1;
+}
+
+message SyncAuthUserRequest {
+  string user_id = 1;
+  string email = 2;
+}
+
+message SyncAuthUserResponse {
+  string status = 1;
 }
 
 // GetUserStatus messages (internal, for ban check)
