@@ -52,3 +52,13 @@ func (m *MockAuth) RestorePasswordComplete(userID string, requestID string, newP
 	args := m.Called(userID, requestID, newPassword)
 	return args.Error(0)
 }
+
+func (m *MockAuth) AdminChangePassword(userID string, newPassword string) error {
+	args := m.Called(userID, newPassword)
+	return args.Error(0)
+}
+
+func (m *MockAuth) AdminDeleteUser(userID string) error {
+	args := m.Called(userID)
+	return args.Error(0)
+}

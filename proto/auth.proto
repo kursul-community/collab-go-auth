@@ -74,6 +74,12 @@ service Auth {
       body: "*"
     };
   }
+
+  // Административная смена пароля пользователя (без верификации старого пароля)
+  rpc AdminChangePassword(AdminChangePasswordRequest) returns (AdminChangePasswordResponse);
+
+  // Административное удаление пользователя (удаляет аккаунт и все сессии)
+  rpc AdminDeleteUser(AdminDeleteUserRequest) returns (AdminDeleteUserResponse);
 }
 
 message RegisterRequest {
@@ -161,5 +167,24 @@ message RestorePasswordCompleteRequest {
 }
 
 message RestorePasswordCompleteResponse {
+  // Пустой ответ при успехе
+}
+
+// === Административные операции ===
+
+message AdminChangePasswordRequest {
+  string user_id = 1;
+  string new_password = 2;
+}
+
+message AdminChangePasswordResponse {
+  // Пустой ответ при успехе
+}
+
+message AdminDeleteUserRequest {
+  string user_id = 1;
+}
+
+message AdminDeleteUserResponse {
   // Пустой ответ при успехе
 }
