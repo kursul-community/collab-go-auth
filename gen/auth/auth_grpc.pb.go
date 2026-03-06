@@ -49,9 +49,9 @@ type AuthClient interface {
 	RestorePasswordBegin(ctx context.Context, in *RestorePasswordBeginRequest, opts ...grpc.CallOption) (*RestorePasswordBeginResponse, error)
 	// Завершение восстановления пароля
 	RestorePasswordComplete(ctx context.Context, in *RestorePasswordCompleteRequest, opts ...grpc.CallOption) (*RestorePasswordCompleteResponse, error)
-	// Смена пароля пользователя по user_id (для админ-панели)
+	// Административная смена пароля пользователя (без верификации старого пароля)
 	AdminChangePassword(ctx context.Context, in *AdminChangePasswordRequest, opts ...grpc.CallOption) (*AdminChangePasswordResponse, error)
-	// Удаление пользователя по user_id (для админ-панели)
+	// Административное удаление пользователя (удаляет аккаунт и все сессии)
 	AdminDeleteUser(ctx context.Context, in *AdminDeleteUserRequest, opts ...grpc.CallOption) (*AdminDeleteUserResponse, error)
 }
 
@@ -190,9 +190,9 @@ type AuthServer interface {
 	RestorePasswordBegin(context.Context, *RestorePasswordBeginRequest) (*RestorePasswordBeginResponse, error)
 	// Завершение восстановления пароля
 	RestorePasswordComplete(context.Context, *RestorePasswordCompleteRequest) (*RestorePasswordCompleteResponse, error)
-	// Смена пароля пользователя по user_id (для админ-панели)
+	// Административная смена пароля пользователя (без верификации старого пароля)
 	AdminChangePassword(context.Context, *AdminChangePasswordRequest) (*AdminChangePasswordResponse, error)
-	// Удаление пользователя по user_id (для админ-панели)
+	// Административное удаление пользователя (удаляет аккаунт и все сессии)
 	AdminDeleteUser(context.Context, *AdminDeleteUserRequest) (*AdminDeleteUserResponse, error)
 	mustEmbedUnimplementedAuthServer()
 }

@@ -80,9 +80,9 @@ type AuthUseCase interface {
 	RestorePasswordBegin(email string, frontendURL string) error
 	// RestorePasswordComplete - завершение восстановления пароля
 	RestorePasswordComplete(userID string, requestID string, newPassword string) error
-	// AdminChangePassword - смена пароля администратором (без requestID)
+	// AdminChangePassword - административная смена пароля (без верификации старого)
 	AdminChangePassword(userID string, newPassword string) error
-	// AdminDeleteUser - удаление пользователя администратором
+	// AdminDeleteUser - административное удаление пользователя и всех его сессий
 	AdminDeleteUser(userID string) error
 }
 
@@ -639,7 +639,8 @@ func (uc *auth) Logout(refreshToken string) error {
 	return nil
 }
 
-// AdminChangePassword - смена пароля пользователя администратором (без requestID)
+// AdminChangePassword - административная смена пароля пользователя.
+// Не требует знания старого пароля. Отзывает все сессии для безопасности.
 func (uc *auth) AdminChangePassword(userID string, newPassword string) error {
 	ctx := context.Background()
 
@@ -654,20 +655,22 @@ func (uc *auth) AdminChangePassword(userID string, newPassword string) error {
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {
-		return fmt.Errorf("failed to hash password: %w", err)
+		return fmt.Errorf("admin change password: hash: %w", err)
 	}
 
 	if err := uc.userRepo.UpdatePassword(ctx, userID, string(hashedPassword)); err != nil {
-		return fmt.Errorf("failed to update password: %w", err)
+		return fmt.Errorf("admin change password: update: %w", err)
 	}
 
-	// Отзываем все токены пользователя после смены пароля
+	// Отзываем все токены — пользователь будет вынужден заново войти
 	uc.tokenRepo.RevokeAllUserTokens(ctx, userID)
 
+	log.Printf("[Admin] Password changed for user: %s", userID)
 	return nil
 }
 
-// AdminDeleteUser - удаление пользователя администратором
+// AdminDeleteUser - административное удаление пользователя.
+// Удаляет учетную запись из БД и все сессии из Redis.
 func (uc *auth) AdminDeleteUser(userID string) error {
 	ctx := context.Background()
 
@@ -676,14 +679,20 @@ func (uc *auth) AdminDeleteUser(userID string) error {
 		return ErrUserNotFound
 	}
 
-	// Отзываем все токены
+	// Сначала отзываем все токены (Redis)
 	uc.tokenRepo.RevokeAllUserTokens(ctx, userID)
 
-	// Удаляем пользователя из БД
+	// Очищаем Redis-ключи верификации и сброса пароля
+	uc.tokenRepo.DeleteVerificationCode(ctx, userID)
+	uc.tokenRepo.DeleteEmailVerificationRequest(ctx, userID)
+	uc.tokenRepo.DeletePasswordResetRequest(ctx, userID)
+
+	// Удаляем пользователя из PostgreSQL
 	if err := uc.userRepo.DeleteUser(ctx, userID); err != nil {
-		return fmt.Errorf("failed to delete user: %w", err)
+		return fmt.Errorf("admin delete user: %w", err)
 	}
 
+	log.Printf("[Admin] User deleted: %s", userID)
 	return nil
 }
 
