@@ -18,6 +18,12 @@ var (
 	ErrRefreshTokenExpired = errors.New("refresh token expired")
 )
 
+// TokenClaims содержит извлеченные из JWT данные
+type TokenClaims struct {
+	UserID   string
+	IssuedAt time.Time
+}
+
 // JWTToken - интерфейс для работы с токенами
 type JWTToken interface {
 	// GenerateAccessToken - генерация access токена
@@ -30,6 +36,8 @@ type JWTToken interface {
 	RefreshAccessToken(refreshToken string) (string, error)
 	// GetUserIDFromToken - извлечение userID из токена
 	GetUserIDFromToken(token string) (string, error)
+	// GetClaimsFromToken - извлечение claims (userID + issuedAt) из токена
+	GetClaimsFromToken(token string) (*TokenClaims, error)
 }
 
 // service - реализация интерфейса Service
@@ -94,10 +102,12 @@ func (s *jwtToken) RefreshAccessToken(refreshToken string) (string, error) {
 
 // generateToken - вспомогательный метод для генерации токена
 func (s *jwtToken) generateToken(userID string, ttl time.Duration) (string, error) {
+	now := time.Now()
 	claims := &jwt.RegisteredClaims{
 		Issuer:    userID,
 		Subject:   userID,
-		ExpiresAt: jwt.NewNumericDate(time.Now().Add(ttl)),
+		IssuedAt:  jwt.NewNumericDate(now),
+		ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(s.secret))
@@ -110,6 +120,22 @@ func (s *jwtToken) GetUserIDFromToken(token string) (string, error) {
 		return "", err
 	}
 	return claims.Subject, nil
+}
+
+// GetClaimsFromToken - извлечение claims (userID + issuedAt) из токена
+func (s *jwtToken) GetClaimsFromToken(tokenStr string) (*TokenClaims, error) {
+	claims, err := s.parseToken(tokenStr)
+	if err != nil {
+		return nil, err
+	}
+
+	tc := &TokenClaims{
+		UserID: claims.Subject,
+	}
+	if claims.IssuedAt != nil {
+		tc.IssuedAt = claims.IssuedAt.Time
+	}
+	return tc, nil
 }
 
 // parseToken - парсинг токена и валидация

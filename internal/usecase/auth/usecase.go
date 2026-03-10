@@ -199,6 +199,15 @@ func (uc *auth) Register(email string, password string) (string, string, error) 
 		return "", "", err
 	}
 
+	if uc.userClient != nil {
+		if err := uc.userClient.SyncAuthUser(ctx, createdID, email); err != nil {
+			if rollbackErr := uc.userRepo.DeleteUser(ctx, createdID); rollbackErr != nil {
+				log.Printf("Failed to rollback auth user after sync error: %v", rollbackErr)
+			}
+			return "", "", fmt.Errorf("failed to sync user-service profile: %w", err)
+		}
+	}
+
 	// Генерируем случайный requestID для верификации email
 	requestID := uuid.New().String()
 

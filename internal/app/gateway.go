@@ -21,6 +21,10 @@ import (
 
 	"go-auth/config"
 	"go-auth/gen/auth"
+	redisadapter "go-auth/internal/adapter/redis"
+	"go-auth/internal/adapter/token"
+	userclient "go-auth/internal/adapter/user"
+	"go-auth/internal/app/middleware"
 	oauthhttp "go-auth/internal/controller/http/oauth"
 )
 
@@ -28,12 +32,12 @@ import (
 const (
 	AccessTokenCookieName  = "access_token"
 	RefreshTokenCookieName = "refresh_token"
-	AccessTokenMaxAge      = 86400    // 3 дня
+	AccessTokenMaxAge      = 86400          // 3 дня
 	RefreshTokenMaxAge     = 30 * 24 * 3600 // 30 дней
 )
 
 // RunGateway - запускает HTTP Gateway сервер для REST API
-func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
+func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler, tokenSvc token.JWTToken, banCache redisadapter.BanCache, userSvcClient userclient.Client) error {
 	logger := log.Default()
 
 	ctx := context.Background()
@@ -296,8 +300,8 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler) error {
 	// gRPC Gateway обрабатывает остальные запросы
 	mainMux.Handle("/", grpcMux)
 
-	// Настраиваем цепочку middleware: CORS -> Cookie -> Handler
-	handler := corsMiddleware(cfg, cookieMiddleware(cfg, mainMux))
+	// Настраиваем цепочку middleware: CORS -> BanCheck -> Cookie -> Handler
+	handler := corsMiddleware(cfg, middleware.BanCheckMiddleware(tokenSvc, banCache, userSvcClient, cookieMiddleware(cfg, mainMux)))
 
 	// Запускаем HTTP сервер
 	httpAddr := fmt.Sprintf(":%d", cfg.HTTP.Port)
