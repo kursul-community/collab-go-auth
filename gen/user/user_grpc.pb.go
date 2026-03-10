@@ -25,6 +25,8 @@ const (
 	UserService_GetProfileByID_FullMethodName = "/user.UserService/GetProfileByID"
 	UserService_UpdateGitURL_FullMethodName   = "/user.UserService/UpdateGitURL"
 	UserService_GetPositions_FullMethodName   = "/user.UserService/GetPositions"
+	UserService_SyncAuthUser_FullMethodName   = "/user.UserService/SyncAuthUser"
+	UserService_GetUserStatus_FullMethodName  = "/user.UserService/GetUserStatus"
 )
 
 // UserServiceClient is the client API for UserService service.
@@ -42,6 +44,10 @@ type UserServiceClient interface {
 	UpdateGitURL(ctx context.Context, in *UpdateGitURLRequest, opts ...grpc.CallOption) (*UpdateGitURLResponse, error)
 	// Получить список доступных позиций
 	GetPositions(ctx context.Context, in *GetPositionsRequest, opts ...grpc.CallOption) (*GetPositionsResponse, error)
+	// Синхронизация пользователя из auth-service при регистрации
+	SyncAuthUser(ctx context.Context, in *SyncAuthUserRequest, opts ...grpc.CallOption) (*SyncAuthUserResponse, error)
+	// Получить статус пользователя (internal, для ban check)
+	GetUserStatus(ctx context.Context, in *GetUserStatusRequest, opts ...grpc.CallOption) (*GetUserStatusResponse, error)
 }
 
 type userServiceClient struct {
@@ -112,6 +118,26 @@ func (c *userServiceClient) GetPositions(ctx context.Context, in *GetPositionsRe
 	return out, nil
 }
 
+func (c *userServiceClient) SyncAuthUser(ctx context.Context, in *SyncAuthUserRequest, opts ...grpc.CallOption) (*SyncAuthUserResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SyncAuthUserResponse)
+	err := c.cc.Invoke(ctx, UserService_SyncAuthUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) GetUserStatus(ctx context.Context, in *GetUserStatusRequest, opts ...grpc.CallOption) (*GetUserStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetUserStatusResponse)
+	err := c.cc.Invoke(ctx, UserService_GetUserStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // UserServiceServer is the server API for UserService service.
 // All implementations must embed UnimplementedUserServiceServer
 // for forward compatibility.
@@ -127,6 +153,10 @@ type UserServiceServer interface {
 	UpdateGitURL(context.Context, *UpdateGitURLRequest) (*UpdateGitURLResponse, error)
 	// Получить список доступных позиций
 	GetPositions(context.Context, *GetPositionsRequest) (*GetPositionsResponse, error)
+	// Синхронизация пользователя из auth-service при регистрации
+	SyncAuthUser(context.Context, *SyncAuthUserRequest) (*SyncAuthUserResponse, error)
+	// Получить статус пользователя (internal, для ban check)
+	GetUserStatus(context.Context, *GetUserStatusRequest) (*GetUserStatusResponse, error)
 	mustEmbedUnimplementedUserServiceServer()
 }
 
@@ -154,6 +184,12 @@ func (UnimplementedUserServiceServer) UpdateGitURL(context.Context, *UpdateGitUR
 }
 func (UnimplementedUserServiceServer) GetPositions(context.Context, *GetPositionsRequest) (*GetPositionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetPositions not implemented")
+}
+func (UnimplementedUserServiceServer) SyncAuthUser(context.Context, *SyncAuthUserRequest) (*SyncAuthUserResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SyncAuthUser not implemented")
+}
+func (UnimplementedUserServiceServer) GetUserStatus(context.Context, *GetUserStatusRequest) (*GetUserStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetUserStatus not implemented")
 }
 func (UnimplementedUserServiceServer) mustEmbedUnimplementedUserServiceServer() {}
 func (UnimplementedUserServiceServer) testEmbeddedByValue()                     {}
@@ -284,6 +320,42 @@ func _UserService_GetPositions_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UserService_SyncAuthUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SyncAuthUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).SyncAuthUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_SyncAuthUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).SyncAuthUser(ctx, req.(*SyncAuthUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_GetUserStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetUserStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).GetUserStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_GetUserStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).GetUserStatus(ctx, req.(*GetUserStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // UserService_ServiceDesc is the grpc.ServiceDesc for UserService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -314,6 +386,14 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetPositions",
 			Handler:    _UserService_GetPositions_Handler,
+		},
+		{
+			MethodName: "SyncAuthUser",
+			Handler:    _UserService_SyncAuthUser_Handler,
+		},
+		{
+			MethodName: "GetUserStatus",
+			Handler:    _UserService_GetUserStatus_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
