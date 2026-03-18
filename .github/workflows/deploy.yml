@@ -8,12 +8,11 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  # Имя образа в нижнем регистре
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  build-and-push:
+    runs-on: self-hosted
     permissions:
       contents: read
       packages: write
@@ -26,126 +25,37 @@ jobs:
         run: |
           echo "IMAGE_NAME_LOWER=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}
-          tags: |
-            type=raw,value=latest
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      # - name: Build and push
-      #   uses: docker/build-push-action@v5
-      #   with:
-      #     context: .
-      #     push: true
-      #     tags: |
-      #       ghcr.io/kursul-community/collab-go-auth:latest
-      #       ghcr.io/kursul-community/collab-go-auth:${{ github.sha }}
-      #     labels: ${{ steps.meta.outputs.labels }}
-      #     # Кэширование для ускорения сборки
-      #     cache-from: type=gha
-      #     cache-to: type=gha,mode=max
+      - name: Determine tag
+        id: tag
+        run: |
+          if [ "${{ github.base_ref }}" = "main" ]; then
+            echo "tag=latest" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Build Image and export to tar
+      - name: Build and push image
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: false
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:build
-          outputs: type=docker,dest=/tmp/image.tar
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ steps.tag.outputs.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-        
-      - name: Upload image artifact
-        uses: actions/upload-artifact@v4
-        with: 
-          name: docker-image
-          path: /tmp/image.tar
-          retention-days: 1        
-  
-  push-sha:
-    runs-on: ubuntu-latest
-    needs: build
-    if: ${{ github.base_ref == 'dev' }}
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - name: Lowercase image name
-        run: |
-          echo "IMAGE_NAME_LOWER=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
-
-      - name: Download image artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: docker-image
-          path: /tmp
-
-      - name: Load image
-        run: docker load -i /tmp/image.tar
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Tag and push sha
-        run: |
-          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:build ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ github.sha }}
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ github.sha }}
-
-  push-latest:
-    runs-on: ubuntu-latest
-    needs: build
-    if: ${{ github.base_ref == 'main' }}
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - name: Lowercase image name
-        run: |
-          echo "IMAGE_NAME_LOWER=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
-
-      - name: Download image artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: docker-image
-          path: /tmp
-
-      - name: Load image
-        run: docker load -i /tmp/image.tar
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Tag and push latest
-        run: |
-          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:build ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest
 
   deploy-dev:
-    runs-on: ubuntu-latest
-    needs: push-sha
-    # Secrets are not available to workflows triggered from forked PRs.
+    runs-on: self-hosted
+    needs: build-and-push
     if: ${{ github.base_ref == 'dev' && github.event.pull_request.head.repo.full_name == github.repository }}
     environment: dev
     permissions:
@@ -179,9 +89,8 @@ jobs:
             kubectl -n collab rollout restart deploy/collab-go-auth
 
   deploy-main:
-    runs-on: ubuntu-latest
-    needs: push-latest
-    # Secrets are not available to workflows triggered from forked PRs.
+    runs-on: self-hosted
+    needs: build-and-push
     if: ${{ github.base_ref == 'main' && github.event.pull_request.head.repo.full_name == github.repository }}
     environment: prod
     permissions:
