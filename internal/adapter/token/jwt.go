@@ -18,9 +18,16 @@ var (
 	ErrRefreshTokenExpired = errors.New("refresh token expired")
 )
 
+// customClaims — JWT claims с ролью пользователя
+type customClaims struct {
+	jwt.RegisteredClaims
+	Role string `json:"role,omitempty"`
+}
+
 // TokenClaims содержит извлеченные из JWT данные
 type TokenClaims struct {
 	UserID   string
+	Role     string
 	IssuedAt time.Time
 }
 
@@ -36,7 +43,7 @@ type JWTToken interface {
 	RefreshAccessToken(refreshToken string) (string, error)
 	// GetUserIDFromToken - извлечение userID из токена
 	GetUserIDFromToken(token string) (string, error)
-	// GetClaimsFromToken - извлечение claims (userID + issuedAt) из токена
+	// GetClaimsFromToken - извлечение claims (userID + role + issuedAt) из токена
 	GetClaimsFromToken(token string) (*TokenClaims, error)
 }
 
@@ -61,12 +68,12 @@ func New(secret string, accessTTL, refreshTTL time.Duration) (JWTToken, error) {
 
 // GenerateAccessToken - генерация access токена
 func (s *jwtToken) GenerateAccessToken(user *entity.User) (string, error) {
-	return s.generateToken(user.ID, s.accessTTL)
+	return s.generateToken(user.ID, user.Role, s.accessTTL)
 }
 
 // GenerateRefreshToken - генерация refresh токена
 func (s *jwtToken) GenerateRefreshToken(user *entity.User) (string, error) {
-	return s.generateToken(user.ID, s.refreshTTL)
+	return s.generateToken(user.ID, user.Role, s.refreshTTL)
 }
 
 // ValidateToken - валидация токена
@@ -96,18 +103,28 @@ func (s *jwtToken) RefreshAccessToken(refreshToken string) (string, error) {
 		return "", ErrRefreshTokenExpired
 	}
 
-	// Генерируем новый access токен
-	return s.generateToken(claims.Subject, s.accessTTL)
+	// Генерируем новый access токен с той же ролью
+	role := claims.Role
+	if role == "" {
+		role = "user"
+	}
+	return s.generateToken(claims.Subject, role, s.accessTTL)
 }
 
 // generateToken - вспомогательный метод для генерации токена
-func (s *jwtToken) generateToken(userID string, ttl time.Duration) (string, error) {
+func (s *jwtToken) generateToken(userID string, role string, ttl time.Duration) (string, error) {
+	if role == "" {
+		role = "user"
+	}
 	now := time.Now()
-	claims := &jwt.RegisteredClaims{
-		Issuer:    userID,
-		Subject:   userID,
-		IssuedAt:  jwt.NewNumericDate(now),
-		ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
+	claims := &customClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    userID,
+			Subject:   userID,
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
+		},
+		Role: role,
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(s.secret))
@@ -122,15 +139,21 @@ func (s *jwtToken) GetUserIDFromToken(token string) (string, error) {
 	return claims.Subject, nil
 }
 
-// GetClaimsFromToken - извлечение claims (userID + issuedAt) из токена
+// GetClaimsFromToken - извлечение claims (userID + role + issuedAt) из токена
 func (s *jwtToken) GetClaimsFromToken(tokenStr string) (*TokenClaims, error) {
 	claims, err := s.parseToken(tokenStr)
 	if err != nil {
 		return nil, err
 	}
 
+	role := claims.Role
+	if role == "" {
+		role = "user" // обратная совместимость со старыми токенами
+	}
+
 	tc := &TokenClaims{
 		UserID: claims.Subject,
+		Role:   role,
 	}
 	if claims.IssuedAt != nil {
 		tc.IssuedAt = claims.IssuedAt.Time
@@ -139,14 +162,14 @@ func (s *jwtToken) GetClaimsFromToken(tokenStr string) (*TokenClaims, error) {
 }
 
 // parseToken - парсинг токена и валидация
-func (s *jwtToken) parseToken(tokenString string) (*jwt.RegisteredClaims, error) {
-	token, err := jwt.ParseWithClaims(tokenString, &jwt.RegisteredClaims{}, func(t *jwt.Token) (interface{}, error) {
+func (s *jwtToken) parseToken(tokenString string) (*customClaims, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &customClaims{}, func(t *jwt.Token) (interface{}, error) {
 		return []byte(s.secret), nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	claims, ok := token.Claims.(*jwt.RegisteredClaims)
+	claims, ok := token.Claims.(*customClaims)
 	if !ok || !token.Valid {
 		return nil, ErrInvalidToken
 	}

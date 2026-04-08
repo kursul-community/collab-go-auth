@@ -29,6 +29,12 @@ func BanCheckMiddleware(
 	next http.Handler,
 ) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Пропускаем session-info — забаненный пользователь должен узнать свой статус
+		if strings.HasSuffix(r.URL.Path, "/auth/session-info") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		// 1. Извлекаем токен из заголовка Authorization
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {

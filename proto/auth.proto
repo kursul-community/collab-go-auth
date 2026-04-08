@@ -80,6 +80,13 @@ service Auth {
 
   // Административное удаление пользователя (удаляет аккаунт и все сессии)
   rpc AdminDeleteUser(AdminDeleteUserRequest) returns (AdminDeleteUserResponse);
+
+  // Получение информации о сессии (статус, роль)
+  rpc GetSessionInfo(GetSessionInfoRequest) returns (GetSessionInfoResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/auth/session-info"
+    };
+  }
 }
 
 message RegisterRequest {
@@ -187,4 +194,15 @@ message AdminDeleteUserRequest {
 
 message AdminDeleteUserResponse {
   // Пустой ответ при успехе
+}
+
+// === Информация о сессии ===
+
+message GetSessionInfoRequest {
+  string access_token = 1;
+}
+
+message GetSessionInfoResponse {
+  string status = 1; // "active" или "banned"
+  string role = 2;   // "user" или "admin"
 }

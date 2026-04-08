@@ -1026,6 +1026,102 @@ func (*AdminDeleteUserResponse) Descriptor() ([]byte, []int) {
 	return file_auth_proto_rawDescGZIP(), []int{21}
 }
 
+type GetSessionInfoRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccessToken   string                 `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSessionInfoRequest) Reset() {
+	*x = GetSessionInfoRequest{}
+	mi := &file_auth_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSessionInfoRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSessionInfoRequest) ProtoMessage() {}
+
+func (x *GetSessionInfoRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSessionInfoRequest.ProtoReflect.Descriptor instead.
+func (*GetSessionInfoRequest) Descriptor() ([]byte, []int) {
+	return file_auth_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *GetSessionInfoRequest) GetAccessToken() string {
+	if x != nil {
+		return x.AccessToken
+	}
+	return ""
+}
+
+type GetSessionInfoResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"` // "active" или "banned"
+	Role          string                 `protobuf:"bytes,2,opt,name=role,proto3" json:"role,omitempty"`     // "user" или "admin"
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSessionInfoResponse) Reset() {
+	*x = GetSessionInfoResponse{}
+	mi := &file_auth_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSessionInfoResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSessionInfoResponse) ProtoMessage() {}
+
+func (x *GetSessionInfoResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSessionInfoResponse.ProtoReflect.Descriptor instead.
+func (*GetSessionInfoResponse) Descriptor() ([]byte, []int) {
+	return file_auth_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *GetSessionInfoResponse) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *GetSessionInfoResponse) GetRole() string {
+	if x != nil {
+		return x.Role
+	}
+	return ""
+}
+
 var File_auth_proto protoreflect.FileDescriptor
 
 const file_auth_proto_rawDesc = "" +
@@ -1083,7 +1179,13 @@ const file_auth_proto_rawDesc = "" +
 	"\x1bAdminChangePasswordResponse\"1\n" +
 	"\x16AdminDeleteUserRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\"\x19\n" +
-	"\x17AdminDeleteUserResponse2\xbe\t\n" +
+	"\x17AdminDeleteUserResponse\":\n" +
+	"\x15GetSessionInfoRequest\x12!\n" +
+	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\"D\n" +
+	"\x16GetSessionInfoResponse\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\x12\x12\n" +
+	"\x04role\x18\x02 \x01(\tR\x04role2\xae\n" +
+	"\n" +
 	"\x04Auth\x12[\n" +
 	"\bRegister\x12\x15.auth.RegisterRequest\x1a\x16.auth.RegisterResponse\" \x82\xd3\xe4\x93\x02\x1a:\x01*\"\x15/api/v1/auth/register\x12O\n" +
 	"\x05Login\x12\x12.auth.LoginRequest\x1a\x13.auth.LoginResponse\"\x1d\x82\xd3\xe4\x93\x02\x17:\x01*\"\x12/api/v1/auth/login\x12f\n" +
@@ -1095,7 +1197,8 @@ const file_auth_proto_rawDesc = "" +
 	"\x14RestorePasswordBegin\x12!.auth.RestorePasswordBeginRequest\x1a\".auth.RestorePasswordBeginResponse\".\x82\xd3\xe4\x93\x02(:\x01*\"#/api/v1/auth/restore-password/begin\x12\x99\x01\n" +
 	"\x17RestorePasswordComplete\x12$.auth.RestorePasswordCompleteRequest\x1a%.auth.RestorePasswordCompleteResponse\"1\x82\xd3\xe4\x93\x02+:\x01*\"&/api/v1/auth/restore-password/complete\x12Z\n" +
 	"\x13AdminChangePassword\x12 .auth.AdminChangePasswordRequest\x1a!.auth.AdminChangePasswordResponse\x12N\n" +
-	"\x0fAdminDeleteUser\x12\x1c.auth.AdminDeleteUserRequest\x1a\x1d.auth.AdminDeleteUserResponseB\x12Z\x10go-auth/gen/authb\x06proto3"
+	"\x0fAdminDeleteUser\x12\x1c.auth.AdminDeleteUserRequest\x1a\x1d.auth.AdminDeleteUserResponse\x12n\n" +
+	"\x0eGetSessionInfo\x12\x1b.auth.GetSessionInfoRequest\x1a\x1c.auth.GetSessionInfoResponse\"!\x82\xd3\xe4\x93\x02\x1b\x12\x19/api/v1/auth/session-infoB\x12Z\x10go-auth/gen/authb\x06proto3"
 
 var (
 	file_auth_proto_rawDescOnce sync.Once
@@ -1109,7 +1212,7 @@ func file_auth_proto_rawDescGZIP() []byte {
 	return file_auth_proto_rawDescData
 }
 
-var file_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_auth_proto_goTypes = []any{
 	(*RegisterRequest)(nil),                 // 0: auth.RegisterRequest
 	(*RegisterResponse)(nil),                // 1: auth.RegisterResponse
@@ -1133,6 +1236,8 @@ var file_auth_proto_goTypes = []any{
 	(*AdminChangePasswordResponse)(nil),     // 19: auth.AdminChangePasswordResponse
 	(*AdminDeleteUserRequest)(nil),          // 20: auth.AdminDeleteUserRequest
 	(*AdminDeleteUserResponse)(nil),         // 21: auth.AdminDeleteUserResponse
+	(*GetSessionInfoRequest)(nil),           // 22: auth.GetSessionInfoRequest
+	(*GetSessionInfoResponse)(nil),          // 23: auth.GetSessionInfoResponse
 }
 var file_auth_proto_depIdxs = []int32{
 	0,  // 0: auth.Auth.Register:input_type -> auth.RegisterRequest
@@ -1146,19 +1251,21 @@ var file_auth_proto_depIdxs = []int32{
 	16, // 8: auth.Auth.RestorePasswordComplete:input_type -> auth.RestorePasswordCompleteRequest
 	18, // 9: auth.Auth.AdminChangePassword:input_type -> auth.AdminChangePasswordRequest
 	20, // 10: auth.Auth.AdminDeleteUser:input_type -> auth.AdminDeleteUserRequest
-	1,  // 11: auth.Auth.Register:output_type -> auth.RegisterResponse
-	3,  // 12: auth.Auth.Login:output_type -> auth.LoginResponse
-	5,  // 13: auth.Auth.RefreshToken:output_type -> auth.RefreshTokenResponse
-	7,  // 14: auth.Auth.Logout:output_type -> auth.LogoutResponse
-	9,  // 15: auth.Auth.ValidateToken:output_type -> auth.ValidateTokenResponse
-	11, // 16: auth.Auth.ResendVerificationEmail:output_type -> auth.ResendVerificationEmailResponse
-	13, // 17: auth.Auth.VerifyEmail:output_type -> auth.VerifyEmailResponse
-	15, // 18: auth.Auth.RestorePasswordBegin:output_type -> auth.RestorePasswordBeginResponse
-	17, // 19: auth.Auth.RestorePasswordComplete:output_type -> auth.RestorePasswordCompleteResponse
-	19, // 20: auth.Auth.AdminChangePassword:output_type -> auth.AdminChangePasswordResponse
-	21, // 21: auth.Auth.AdminDeleteUser:output_type -> auth.AdminDeleteUserResponse
-	11, // [11:22] is the sub-list for method output_type
-	0,  // [0:11] is the sub-list for method input_type
+	22, // 11: auth.Auth.GetSessionInfo:input_type -> auth.GetSessionInfoRequest
+	1,  // 12: auth.Auth.Register:output_type -> auth.RegisterResponse
+	3,  // 13: auth.Auth.Login:output_type -> auth.LoginResponse
+	5,  // 14: auth.Auth.RefreshToken:output_type -> auth.RefreshTokenResponse
+	7,  // 15: auth.Auth.Logout:output_type -> auth.LogoutResponse
+	9,  // 16: auth.Auth.ValidateToken:output_type -> auth.ValidateTokenResponse
+	11, // 17: auth.Auth.ResendVerificationEmail:output_type -> auth.ResendVerificationEmailResponse
+	13, // 18: auth.Auth.VerifyEmail:output_type -> auth.VerifyEmailResponse
+	15, // 19: auth.Auth.RestorePasswordBegin:output_type -> auth.RestorePasswordBeginResponse
+	17, // 20: auth.Auth.RestorePasswordComplete:output_type -> auth.RestorePasswordCompleteResponse
+	19, // 21: auth.Auth.AdminChangePassword:output_type -> auth.AdminChangePasswordResponse
+	21, // 22: auth.Auth.AdminDeleteUser:output_type -> auth.AdminDeleteUserResponse
+	23, // 23: auth.Auth.GetSessionInfo:output_type -> auth.GetSessionInfoResponse
+	12, // [12:24] is the sub-list for method output_type
+	0,  // [0:12] is the sub-list for method input_type
 	0,  // [0:0] is the sub-list for extension type_name
 	0,  // [0:0] is the sub-list for extension extendee
 	0,  // [0:0] is the sub-list for field type_name
@@ -1175,7 +1282,7 @@ func file_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_auth_proto_rawDesc), len(file_auth_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   22,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

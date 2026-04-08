@@ -12,6 +12,7 @@ type User struct {
 	EmailVerified   bool      `json:"email_verified"`    // Флаг подтверждения email
 	OAuthProvider   *string   `json:"oauth_provider"`    // OAuth провайдер (google, github, yandex, vk) или nil
 	OAuthProviderID *string   `json:"oauth_provider_id"` // ID пользователя у OAuth провайдера
+	Role            string    `json:"role"`              // Роль пользователя: "user" или "admin"
 }
 
 // IsOAuthUser - проверяет, является ли пользователь OAuth пользователем

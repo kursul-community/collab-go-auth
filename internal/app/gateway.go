@@ -285,6 +285,84 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler, tokenSvc to
 		logger.Printf("OAuth routes registered")
 	}
 
+	// Session info endpoint — возвращает role и status пользователя
+	mainMux.HandleFunc("/api/v1/auth/session-info", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		// Извлекаем токен из Authorization header или cookie
+		accessToken := ""
+		if authHeader := r.Header.Get("Authorization"); authHeader != "" {
+			parts := strings.SplitN(authHeader, " ", 2)
+			if len(parts) == 2 && parts[0] == "Bearer" {
+				accessToken = parts[1]
+			}
+		}
+		if accessToken == "" {
+			if cookie, err := r.Cookie(AccessTokenCookieName); err == nil {
+				accessToken = cookie.Value
+			}
+		}
+		if accessToken == "" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(map[string]string{
+				"error":   "unauthorized",
+				"message": "Missing access token",
+			})
+			return
+		}
+
+		// Извлекаем claims (userID + role) из JWT
+		claims, err := tokenSvc.GetClaimsFromToken(accessToken)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(map[string]string{
+				"error":   "unauthorized",
+				"message": "Invalid or expired token",
+			})
+			return
+		}
+
+		userID := claims.UserID
+		role := claims.Role
+
+		// Определяем status пользователя (Redis кеш → gRPC fallback)
+		userStatus := "active"
+
+		// 1. Проверяем blacklist
+		if _, found, _ := banCache.IsInBanBlacklist(r.Context(), userID); found {
+			userStatus = "banned"
+		}
+
+		// 2. Если не в blacklist — проверяем кеш статуса
+		if userStatus == "active" {
+			if cachedStatus, cached, _ := banCache.GetCachedStatus(r.Context(), userID); cached {
+				userStatus = cachedStatus
+			} else {
+				// 3. Cache miss — gRPC вызов в user-service
+				if grpcStatus, _, err := userSvcClient.GetUserStatus(r.Context(), userID); err == nil {
+					userStatus = grpcStatus
+					_ = banCache.SetCachedStatus(r.Context(), userID, grpcStatus)
+				}
+			}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status": userStatus,
+			"role":   role,
+		})
+	})
+
 	// Health и Ready endpoints для Kubernetes probes
 	mainMux.HandleFunc("/api/v1/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
