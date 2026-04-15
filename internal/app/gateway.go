@@ -388,8 +388,14 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler, tokenSvc to
 	topMux := http.NewServeMux()
 
 	topMux.HandleFunc("/api/v1/auth/forward-auth", func(w http.ResponseWriter, r *http.Request) {
+		// Traefik ForwardAuth отправляет GET, оригинальный метод в X-Forwarded-Method
+		originalMethod := r.Header.Get("X-Forwarded-Method")
+		if originalMethod == "" {
+			originalMethod = r.Method
+		}
+
 		// Пропускаем preflight — у OPTIONS нет токена
-		if r.Method == http.MethodOptions {
+		if originalMethod == http.MethodOptions {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
