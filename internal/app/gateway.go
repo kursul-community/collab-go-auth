@@ -363,6 +363,48 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler, tokenSvc to
 		})
 	})
 
+	// ForwardAuth endpoint для Traefik — централизованная проверка JWT + бан-статуса.
+	// Traefik вызывает этот endpoint перед проксированием запроса в downstream сервис.
+	// 200 + X-User-ID/X-User-Role → запрос пропускается с trusted headers.
+	// 401/403 → запрос блокируется на уровне Traefik.
+	mainMux.HandleFunc("/api/v1/auth/forward-auth", func(w http.ResponseWriter, r *http.Request) {
+		// Извлекаем токен из Authorization header или cookie
+		accessToken := ""
+		if authHeader := r.Header.Get("Authorization"); authHeader != "" {
+			parts := strings.SplitN(authHeader, " ", 2)
+			if len(parts) == 2 && parts[0] == "Bearer" {
+				accessToken = parts[1]
+			}
+		}
+		if accessToken == "" {
+			if cookie, err := r.Cookie(AccessTokenCookieName); err == nil {
+				accessToken = cookie.Value
+			}
+		}
+		if accessToken == "" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		// Валидация JWT
+		claims, err := tokenSvc.GetClaimsFromToken(accessToken)
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		// Проверка бана через shared-функцию
+		if middleware.CheckBanStatus(r.Context(), banCache, userSvcClient, claims.UserID, claims.IssuedAt) {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+
+		// Успех — прокидываем trusted headers для downstream сервиса
+		w.Header().Set("X-User-ID", claims.UserID)
+		w.Header().Set("X-User-Role", claims.Role)
+		w.WriteHeader(http.StatusOK)
+	})
+
 	// Health и Ready endpoints для Kubernetes probes
 	mainMux.HandleFunc("/api/v1/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	redisadapter "go-auth/internal/adapter/redis"
+	tokenrepo "go-auth/internal/repo/token"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -23,8 +24,9 @@ type banEvent struct {
 }
 
 // StartBanSubscriber запускает горутину, слушающую Redis pub/sub канал user:banned.
-// При получении события — добавляет пользователя в blacklist и инвалидирует кеш статуса.
-func StartBanSubscriber(ctx context.Context, redisClient *redis.Client, banCache redisadapter.BanCache) {
+// При получении события — добавляет пользователя в blacklist, инвалидирует кеш статуса
+// и отзывает все активные токены пользователя.
+func StartBanSubscriber(ctx context.Context, redisClient *redis.Client, banCache redisadapter.BanCache, tokenRepo tokenrepo.Repository) {
 	go func() {
 		logger := log.Default()
 		logger.Printf("Ban subscriber: starting, listening on channel '%s'", banChannel)
@@ -72,7 +74,12 @@ func StartBanSubscriber(ctx context.Context, redisClient *redis.Client, banCache
 					logger.Printf("Ban subscriber: failed to invalidate cache for user %s: %v", event.UserID, err)
 				}
 
-				logger.Printf("Ban subscriber: user %s banned at %s — blacklisted and cache invalidated", event.UserID, event.BannedAt)
+				// Отзываем все токены — немедленная инвалидация всех сессий
+				if err := tokenRepo.RevokeAllUserTokens(ctx, event.UserID); err != nil {
+					logger.Printf("Ban subscriber: failed to revoke tokens for user %s: %v", event.UserID, err)
+				}
+
+				logger.Printf("Ban subscriber: user %s banned at %s — blacklisted, cache invalidated, tokens revoked", event.UserID, event.BannedAt)
 			}
 		}
 	}()
