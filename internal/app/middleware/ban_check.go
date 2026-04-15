@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -12,16 +13,62 @@ import (
 	userclient "go-auth/internal/adapter/user"
 )
 
+// CheckBanStatus проверяет статус бана пользователя через 3-уровневую систему:
+// blacklist → cache → gRPC fallback. Возвращает true если пользователь забанен.
+func CheckBanStatus(
+	ctx context.Context,
+	banCache redisadapter.BanCache,
+	userClient userclient.Client,
+	userID string,
+	tokenIssuedAt time.Time,
+) bool {
+	// 1. Проверяем blacklist (самая быстрая проверка — Redis GET)
+	bannedAt, found, err := banCache.IsInBanBlacklist(ctx, userID)
+	if err != nil {
+		log.Printf("ban_check: blacklist check error for user %s: %v", userID, err)
+	}
+	if found {
+		if tokenIssuedAt.IsZero() || tokenIssuedAt.Before(bannedAt) {
+			return true
+		}
+	}
+
+	// 2. Проверяем кеш статуса (Redis GET с TTL 60s)
+	status, cached, err := banCache.GetCachedStatus(ctx, userID)
+	if err != nil {
+		log.Printf("ban_check: cache check error for user %s: %v", userID, err)
+	}
+	if cached {
+		return status == "banned"
+	}
+
+	// 3. Cache miss — делаем gRPC вызов в user-service
+	grpcStatus, grpcBannedAt, err := userClient.GetUserStatus(ctx, userID)
+	if err != nil {
+		log.Printf("ban_check: gRPC GetUserStatus error for user %s: %v", userID, err)
+		return false // fail-open
+	}
+
+	// Кешируем результат
+	if cacheErr := banCache.SetCachedStatus(ctx, userID, grpcStatus); cacheErr != nil {
+		log.Printf("ban_check: cache set error for user %s: %v", userID, cacheErr)
+	}
+
+	// Если забанен — добавляем в blacklist
+	if grpcStatus == "banned" {
+		parsedBannedAt, parseErr := time.Parse(time.RFC3339, grpcBannedAt)
+		if parseErr == nil {
+			if blErr := banCache.AddToBanBlacklist(ctx, userID, parsedBannedAt); blErr != nil {
+				log.Printf("ban_check: add to blacklist error for user %s: %v", userID, blErr)
+			}
+		}
+		return true
+	}
+
+	return false
+}
+
 // BanCheckMiddleware проверяет забаненных пользователей на уровне HTTP.
-//
-// Логика:
-//  1. Извлекает JWT из заголовка Authorization: Bearer <token>
-//  2. Если заголовка нет — пропускает запрос (публичные маршруты)
-//  3. Если токен невалиден — возвращает 401 Unauthorized
-//  4. Проверяет blacklist в Redis (user:banned:<userId>) — быстрая проверка
-//  5. Проверяет кеш статуса (user:status:<userId>) — TTL 60 сек
-//  6. При cache miss — делает gRPC вызов GetUserStatus в user-service
-//  7. Если статус banned — возвращает 403 Forbidden
 func BanCheckMiddleware(
 	tokenSvc token.JWTToken,
 	banCache redisadapter.BanCache,
@@ -29,17 +76,22 @@ func BanCheckMiddleware(
 	next http.Handler,
 ) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Пропускаем эндпоинты, доступные забаненным пользователям
+		if strings.HasSuffix(r.URL.Path, "/auth/session-info") ||
+			strings.HasSuffix(r.URL.Path, "/auth/forward-auth") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		// 1. Извлекаем токен из заголовка Authorization
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			// Нет заголовка — пропускаем (публичные маршруты)
 			next.ServeHTTP(w, r)
 			return
 		}
 
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || parts[0] != "Bearer" {
-			// Неверный формат — пропускаем (пусть бизнес-сервис решит)
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -56,66 +108,12 @@ func BanCheckMiddleware(
 			return
 		}
 
-		userID := claims.UserID
-		tokenIssuedAt := claims.IssuedAt
-
-		// 3. Проверяем blacklist (самая быстрая проверка — Redis GET)
-		bannedAt, found, err := banCache.IsInBanBlacklist(r.Context(), userID)
-		if err != nil {
-			log.Printf("ban_check: blacklist check error for user %s: %v", userID, err)
-			// При ошибке Redis — пропускаем проверку, чтобы не блокировать сервис
-		}
-		if found {
-			// Если iat отсутствует (zero) — считаем что токен выдан до бана (блокируем)
-			if tokenIssuedAt.IsZero() || tokenIssuedAt.Before(bannedAt) {
-				writeBannedResponse(w)
-				return
-			}
-		}
-
-		// 4. Проверяем кеш статуса (Redis GET с TTL 60s)
-		status, cached, err := banCache.GetCachedStatus(r.Context(), userID)
-		if err != nil {
-			log.Printf("ban_check: cache check error for user %s: %v", userID, err)
-		}
-
-		if cached {
-			if status == "banned" {
-				writeBannedResponse(w)
-				return
-			}
-			// status == "active" — пропускаем
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		// 5. Cache miss — делаем gRPC вызов в user-service
-		grpcStatus, grpcBannedAt, err := userClient.GetUserStatus(r.Context(), userID)
-		if err != nil {
-			log.Printf("ban_check: gRPC GetUserStatus error for user %s: %v", userID, err)
-			// При ошибке gRPC — пропускаем проверку (fail-open)
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		// 6. Кешируем результат
-		if cacheErr := banCache.SetCachedStatus(r.Context(), userID, grpcStatus); cacheErr != nil {
-			log.Printf("ban_check: cache set error for user %s: %v", userID, cacheErr)
-		}
-
-		// 7. Если забанен — добавляем в blacklist и блокируем
-		if grpcStatus == "banned" {
-			parsedBannedAt, parseErr := time.Parse(time.RFC3339, grpcBannedAt)
-			if parseErr == nil {
-				if blErr := banCache.AddToBanBlacklist(r.Context(), userID, parsedBannedAt); blErr != nil {
-					log.Printf("ban_check: add to blacklist error for user %s: %v", userID, blErr)
-				}
-			}
+		// 3. Проверяем статус бана
+		if CheckBanStatus(r.Context(), banCache, userClient, claims.UserID, claims.IssuedAt) {
 			writeBannedResponse(w)
 			return
 		}
 
-		// 8. Пользователь активен — пропускаем
 		next.ServeHTTP(w, r)
 	})
 }

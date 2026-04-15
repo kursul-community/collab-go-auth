@@ -75,7 +75,7 @@ func Run(cfg *config.Config, devMode bool) {
 
 	// Инициализация ban cache и subscriber для блокировки забаненных пользователей
 	banCache := redisadapter.NewBanCache(redisClient)
-	subscriber.StartBanSubscriber(ctx, redisClient, banCache)
+	subscriber.StartBanSubscriber(ctx, redisClient, banCache, tokenRepo)
 	logger.Printf("Ban subscriber started, listening on Redis pub/sub channel 'user:banned'")
 
 	// Создаем слой usecase с TTL параметрами
