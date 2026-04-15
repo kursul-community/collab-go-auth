@@ -363,11 +363,37 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler, tokenSvc to
 		})
 	})
 
-	// ForwardAuth endpoint для Traefik — централизованная проверка JWT + бан-статуса.
-	// Traefik вызывает этот endpoint перед проксированием запроса в downstream сервис.
-	// 200 + X-User-ID/X-User-Role → запрос пропускается с trusted headers.
-	// 401/403 → запрос блокируется на уровне Traefik.
-	mainMux.HandleFunc("/api/v1/auth/forward-auth", func(w http.ResponseWriter, r *http.Request) {
+	// Health и Ready endpoints для Kubernetes probes
+	mainMux.HandleFunc("/api/v1/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	mainMux.HandleFunc("/api/v1/ready", func(w http.ResponseWriter, r *http.Request) {
+		// Можно добавить проверку подключения к БД/Redis, если нужно
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	// gRPC Gateway обрабатывает остальные запросы
+	mainMux.Handle("/", grpcMux)
+
+	// Настраиваем цепочку middleware: CORS -> BanCheck -> Cookie -> Handler
+	corsBanCookieChain := corsMiddleware(cfg, middleware.BanCheckMiddleware(tokenSvc, banCache, userSvcClient, cookieMiddleware(cfg, mainMux)))
+
+	// Top-level mux: forward-auth вынесен за пределы CORS middleware,
+	// т.к. это внутренний вызов Traefik, ему CORS не нужен.
+	// Если Traefik вернёт ошибку клиенту — downstream сервис не участвует,
+	// и CORS-заголовки auth-service не должны попасть в ответ.
+	topMux := http.NewServeMux()
+
+	topMux.HandleFunc("/api/v1/auth/forward-auth", func(w http.ResponseWriter, r *http.Request) {
+		// Пропускаем preflight — у OPTIONS нет токена
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
 		// Извлекаем токен из Authorization header или cookie
 		accessToken := ""
 		if authHeader := r.Header.Get("Authorization"); authHeader != "" {
@@ -393,35 +419,22 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler, tokenSvc to
 			return
 		}
 
-		// Проверка бана через shared-функцию
+		// Проверка бана
 		if middleware.CheckBanStatus(r.Context(), banCache, userSvcClient, claims.UserID, claims.IssuedAt) {
 			w.WriteHeader(http.StatusForbidden)
 			return
 		}
 
-		// Успех — прокидываем trusted headers для downstream сервиса
+		// Успех — trusted headers для downstream
 		w.Header().Set("X-User-ID", claims.UserID)
 		w.Header().Set("X-User-Role", claims.Role)
 		w.WriteHeader(http.StatusOK)
 	})
 
-	// Health и Ready endpoints для Kubernetes probes
-	mainMux.HandleFunc("/api/v1/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
-	})
+	// Всё остальное идёт через CORS -> BanCheck -> Cookie chain
+	topMux.Handle("/", corsBanCookieChain)
 
-	mainMux.HandleFunc("/api/v1/ready", func(w http.ResponseWriter, r *http.Request) {
-		// Можно добавить проверку подключения к БД/Redis, если нужно
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
-	})
-
-	// gRPC Gateway обрабатывает остальные запросы
-	mainMux.Handle("/", grpcMux)
-
-	// Настраиваем цепочку middleware: CORS -> BanCheck -> Cookie -> Handler
-	handler := corsMiddleware(cfg, middleware.BanCheckMiddleware(tokenSvc, banCache, userSvcClient, cookieMiddleware(cfg, mainMux)))
+	handler := topMux
 
 	// Запускаем HTTP сервер
 	httpAddr := fmt.Sprintf(":%d", cfg.HTTP.Port)
