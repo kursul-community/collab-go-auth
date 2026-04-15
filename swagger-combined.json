@@ -191,6 +191,33 @@
           }
         }
       },
+      "/auth/session-info": {
+        "get": {
+          "tags": ["Auth"],
+          "summary": "Информация о сессии",
+          "description": "Возвращает статус аккаунта (active/banned) и роль (user/admin). Токен извлекается из Authorization header или cookie access_token. Доступен даже для забаненных пользователей.",
+          "operationId": "getSessionInfo",
+          "security": [{ "BearerAuth": [] }],
+          "responses": {
+            "200": {
+              "description": "Информация о сессии",
+              "content": {
+                "application/json": {
+                  "schema": { "$ref": "#/components/schemas/SessionInfoResponse" }
+                }
+              }
+            },
+            "401": {
+              "description": "Отсутствует или невалидный токен",
+              "content": {
+                "application/json": {
+                  "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                }
+              }
+            }
+          }
+        }
+      },
       "/auth/restore-password/complete": {
         "post": {
           "tags": ["Password Recovery"],
@@ -438,6 +465,28 @@
             "user_id": { "type": "string", "format": "uuid" },
             "request_id": { "type": "string", "format": "uuid" },
             "password": { "type": "string", "minLength": 6 }
+          }
+        },
+        "SessionInfoResponse": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["active", "banned"],
+              "description": "Статус аккаунта"
+            },
+            "role": {
+              "type": "string",
+              "enum": ["user", "admin"],
+              "description": "Роль пользователя"
+            }
+          }
+        },
+        "ErrorResponse": {
+          "type": "object",
+          "properties": {
+            "error": { "type": "string" },
+            "message": { "type": "string" }
           }
         },
         "OAuthAuthUrlResponse": {

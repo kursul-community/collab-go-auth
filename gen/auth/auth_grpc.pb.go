@@ -30,6 +30,7 @@ const (
 	Auth_RestorePasswordComplete_FullMethodName = "/auth.Auth/RestorePasswordComplete"
 	Auth_AdminChangePassword_FullMethodName     = "/auth.Auth/AdminChangePassword"
 	Auth_AdminDeleteUser_FullMethodName         = "/auth.Auth/AdminDeleteUser"
+	Auth_GetSessionInfo_FullMethodName          = "/auth.Auth/GetSessionInfo"
 )
 
 // AuthClient is the client API for Auth service.
@@ -53,6 +54,8 @@ type AuthClient interface {
 	AdminChangePassword(ctx context.Context, in *AdminChangePasswordRequest, opts ...grpc.CallOption) (*AdminChangePasswordResponse, error)
 	// Административное удаление пользователя (удаляет аккаунт и все сессии)
 	AdminDeleteUser(ctx context.Context, in *AdminDeleteUserRequest, opts ...grpc.CallOption) (*AdminDeleteUserResponse, error)
+	// Получение информации о сессии (статус, роль)
+	GetSessionInfo(ctx context.Context, in *GetSessionInfoRequest, opts ...grpc.CallOption) (*GetSessionInfoResponse, error)
 }
 
 type authClient struct {
@@ -173,6 +176,16 @@ func (c *authClient) AdminDeleteUser(ctx context.Context, in *AdminDeleteUserReq
 	return out, nil
 }
 
+func (c *authClient) GetSessionInfo(ctx context.Context, in *GetSessionInfoRequest, opts ...grpc.CallOption) (*GetSessionInfoResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSessionInfoResponse)
+	err := c.cc.Invoke(ctx, Auth_GetSessionInfo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServer is the server API for Auth service.
 // All implementations must embed UnimplementedAuthServer
 // for forward compatibility.
@@ -194,6 +207,8 @@ type AuthServer interface {
 	AdminChangePassword(context.Context, *AdminChangePasswordRequest) (*AdminChangePasswordResponse, error)
 	// Административное удаление пользователя (удаляет аккаунт и все сессии)
 	AdminDeleteUser(context.Context, *AdminDeleteUserRequest) (*AdminDeleteUserResponse, error)
+	// Получение информации о сессии (статус, роль)
+	GetSessionInfo(context.Context, *GetSessionInfoRequest) (*GetSessionInfoResponse, error)
 	mustEmbedUnimplementedAuthServer()
 }
 
@@ -236,6 +251,9 @@ func (UnimplementedAuthServer) AdminChangePassword(context.Context, *AdminChange
 }
 func (UnimplementedAuthServer) AdminDeleteUser(context.Context, *AdminDeleteUserRequest) (*AdminDeleteUserResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method AdminDeleteUser not implemented")
+}
+func (UnimplementedAuthServer) GetSessionInfo(context.Context, *GetSessionInfoRequest) (*GetSessionInfoResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetSessionInfo not implemented")
 }
 func (UnimplementedAuthServer) mustEmbedUnimplementedAuthServer() {}
 func (UnimplementedAuthServer) testEmbeddedByValue()              {}
@@ -456,6 +474,24 @@ func _Auth_AdminDeleteUser_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Auth_GetSessionInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSessionInfoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServer).GetSessionInfo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Auth_GetSessionInfo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServer).GetSessionInfo(ctx, req.(*GetSessionInfoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Auth_ServiceDesc is the grpc.ServiceDesc for Auth service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -506,6 +542,10 @@ var Auth_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AdminDeleteUser",
 			Handler:    _Auth_AdminDeleteUser_Handler,
+		},
+		{
+			MethodName: "GetSessionInfo",
+			Handler:    _Auth_GetSessionInfo_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

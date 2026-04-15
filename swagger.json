@@ -489,6 +489,37 @@
         }
       }
     },
+    "/auth/session-info": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Информация о сессии",
+        "description": "Возвращает статус аккаунта (active/banned) и роль (user/admin) текущего пользователя. Токен извлекается из заголовка Authorization: Bearer <token> или cookie access_token. Этот эндпоинт доступен даже для забаненных пользователей, чтобы они могли узнать свой статус.",
+        "operationId": "getSessionInfo",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Информация о сессии",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionInfoResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Отсутствует или невалидный access токен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/oauth/{provider}": {
       "get": {
         "tags": ["OAuth2"],
@@ -930,6 +961,24 @@
             "maxLength": 128,
             "description": "Новый пароль (6-128 символов)",
             "example": "newSecurePassword123"
+          }
+        }
+      },
+      "SessionInfoResponse": {
+        "type": "object",
+        "required": ["status", "role"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["active", "banned"],
+            "description": "Статус аккаунта",
+            "example": "active"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["user", "admin"],
+            "description": "Роль пользователя",
+            "example": "user"
           }
         }
       },
