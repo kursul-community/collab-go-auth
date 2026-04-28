@@ -97,7 +97,7 @@ jobs:
             flock -w 1800 9
             echo "✅ Acquired deploy lock"
 
-            EXPECTED_TAG="${{ github.sha }}"
+            EXPECTED_TAG="${{ needs.build-and-push.outputs.deploy_tag }}"
             EXPECTED_IMAGE="ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]'):${EXPECTED_TAG}"
 
             helm upgrade --install auth-service \
