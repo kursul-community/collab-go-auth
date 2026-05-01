@@ -29,10 +29,9 @@ type SMTPMailer struct {
 
 // New создает новый экземпляр SMTPMailer
 func New(cfg config.SMTPConfig) (*SMTPMailer, error) {
-	// Парсим встроенные шаблоны
-	tmpl, err := template.New("emails").Parse(emailTemplates)
+	tmpl, err := loadTemplates()
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse email templates: %w", err)
+		return nil, fmt.Errorf("failed to load email templates: %w", err)
 	}
 
 	return &SMTPMailer{

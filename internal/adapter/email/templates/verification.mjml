@@ -1,0 +1,119 @@
+<mjml>
+  <mj-head>
+    <mj-title>Verify your email</mj-title>
+    <mj-preview>Your verification code is inside.</mj-preview>
+    <mj-attributes>
+      <mj-all font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif" />
+      <mj-text color="#a1a1aa" font-size="15px" line-height="1.6" padding="0" />
+    </mj-attributes>
+    <mj-style>
+      body { background-color: #0a0a0a !important; }
+      .brand-mark {
+        display: inline-block;
+        width: 32px; height: 32px; line-height: 32px;
+        text-align: center;
+        background: #7c3aed;
+        background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+        border-radius: 8px;
+        color: #ffffff; font-weight: 700; font-size: 15px;
+        vertical-align: middle;
+      }
+      .brand-name {
+        display: inline-block;
+        font-size: 16px; font-weight: 600; color: #fafafa;
+        vertical-align: middle; margin-left: 10px;
+      }
+      .hero-icon {
+        width: 64px; height: 64px; line-height: 64px;
+        margin: 0 auto;
+        text-align: center;
+        background-color: #0f0f10;
+        border: 1px solid #27272a;
+        border-radius: 14px;
+        font-size: 30px;
+      }
+      .badge {
+        display: inline-block;
+        padding: 6px 14px;
+        background-color: rgba(124, 58, 237, 0.15);
+        color: #a78bfa;
+        font-size: 11px; font-weight: 600; letter-spacing: 0.8px;
+        border-radius: 999px;
+      }
+      .code-container {
+        background: #7c3aed;
+        background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+        border-radius: 14px;
+        padding: 28px;
+        text-align: center;
+      }
+      .code {
+        font-size: 38px; font-weight: 700; letter-spacing: 10px;
+        color: #ffffff;
+        font-family: 'SF Mono', Menlo, Monaco, 'Courier New', monospace;
+      }
+      .validity-dot {
+        display: inline-block;
+        width: 6px; height: 6px;
+        background-color: #facc15;
+        border-radius: 50%;
+        margin-right: 8px;
+        vertical-align: middle;
+      }
+    </mj-style>
+  </mj-head>
+  <mj-body background-color="#0a0a0a" width="640px">
+    <mj-section background-color="#18181b" padding="40px" border="1px solid #27272a" border-radius="16px">
+      <mj-column>
+        <mj-text padding="0 0 32px 0">
+          <span class="brand-mark">{{slice .AppName 0 1}}</span><span class="brand-name">{{.AppName}}</span>
+        </mj-text>
+
+        <mj-text padding="0">
+          <div class="hero-icon">&#9993;&#65039;</div>
+        </mj-text>
+
+        <mj-text align="center" padding="20px 0 16px 0">
+          <span class="badge">&bull; VERIFICATION</span>
+        </mj-text>
+
+        <mj-text align="center" color="#fafafa" font-size="26px" font-weight="700" line-height="1.3" padding="0 0 12px 0">
+          Verify your email
+        </mj-text>
+
+        <mj-text align="center" padding="0 0 28px 0">
+          Enter the code below to confirm your email address.
+        </mj-text>
+
+        <mj-text padding="0 0 16px 0">
+          <div class="code-container"><div class="code">{{.Code}}</div></div>
+        </mj-text>
+
+        <mj-text align="center" font-size="13px" padding="0 0 28px 0">
+          <span class="validity-dot"></span>This code is valid for <strong style="color: #fafafa; font-weight: 600;">15 minutes</strong>
+        </mj-text>
+
+        <mj-divider border-color="#27272a" border-width="1px" padding="0" />
+
+        <mj-text padding="20px 0 0 0" font-size="13px">
+          <table cellpadding="0" cellspacing="0" border="0" style="width: 100%;">
+            <tr>
+              <td style="width: 28px; vertical-align: top; font-size: 18px; padding-right: 12px;">&#128737;</td>
+              <td style="vertical-align: top; line-height: 1.5;">
+                <strong style="color: #fafafa; display: block; margin-bottom: 4px; font-size: 14px; font-weight: 600;">Didn't request this code?</strong>
+                Just ignore this email &mdash; no account changes will happen.
+              </td>
+            </tr>
+          </table>
+        </mj-text>
+
+        <mj-divider border-color="#27272a" border-width="1px" padding="28px 0 0 0" />
+
+        <mj-text align="center" color="#71717a" font-size="12px" padding="20px 0 0 0">
+          Automated message &mdash; please don't reply.<br />
+          &copy; {{.AppName}}
+        </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>
