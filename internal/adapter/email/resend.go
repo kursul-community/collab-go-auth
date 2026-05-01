@@ -1,6 +1,7 @@
 package email
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"html/template"
@@ -65,7 +66,7 @@ func (m *ResendMailer) appName() string {
 
 // renderTemplate рендерит HTML шаблон
 func (m *ResendMailer) renderTemplate(name string, data interface{}) (string, error) {
-	var buf bytesBuffer
+	var buf bytes.Buffer
 	if err := m.templates.ExecuteTemplate(&buf, name, data); err != nil {
 		return "", err
 	}
