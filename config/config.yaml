@@ -99,6 +99,21 @@ smtp:
     welcomeSubject: "Добро пожаловать!"
 
 # -----------------------------------------------------------------------------
+# Email провайдер (выбор между SMTP и Resend)
+# -----------------------------------------------------------------------------
+email:
+  provider: "resend"  # smtp или resend (переопределяется через EMAIL_PROVIDER)
+
+# -----------------------------------------------------------------------------
+# Resend (https://resend.com)
+# API ключ загружается из RESEND_API_KEY
+# -----------------------------------------------------------------------------
+resend:
+  apiKey: ""                              # переопределяется через RESEND_API_KEY
+  from: "noreply@kursul.digital"          # должен быть на верифицированном домене
+  fromName: "Collabify"
+
+# -----------------------------------------------------------------------------
 # Верификация Email
 # -----------------------------------------------------------------------------
 verification:
@@ -215,7 +230,7 @@ oauth:
   backendBaseURL: "http://localhost:8081"
   # Время жизни state токена (защита от CSRF)
   stateTTL: "10m"
-  
+
   providers:
     google:
       enabled: true
@@ -227,7 +242,7 @@ oauth:
       scopes:
         - "email"
         - "profile"
-    
+
     github:
       enabled: true
       displayName: "GitHub"
@@ -237,7 +252,7 @@ oauth:
       scopes:
         - "user:email"
         - "read:user"
-    
+
     yandex:
       enabled: false
       displayName: "Яндекс"
@@ -247,7 +262,7 @@ oauth:
       scopes:
         - "login:email"
         - "login:info"
-    
+
     vk:
       enabled: false
       displayName: "ВКонтакте"

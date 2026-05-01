@@ -13,6 +13,8 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    outputs:
+      deploy_tag: ${{ steps.tag.outputs.deploy_tag }}
     permissions:
       contents: read
       packages: write
@@ -35,13 +37,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Determine tag
+      - name: Determine tags
         id: tag
         run: |
           if [ "${{ github.base_ref }}" = "main" ]; then
-            echo "tag=latest" >> $GITHUB_OUTPUT
+            echo "deploy_tag=prod-${{ github.sha }}" >> $GITHUB_OUTPUT
+            echo "image_tags<<EOF" >> $GITHUB_OUTPUT
+            echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:prod-${{ github.sha }}" >> $GITHUB_OUTPUT
+            echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
           else
-            echo "tag=${{ github.sha }}" >> $GITHUB_OUTPUT
+            echo "deploy_tag=dev-${{ github.sha }}" >> $GITHUB_OUTPUT
+            echo "image_tags=${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:dev-${{ github.sha }}" >> $GITHUB_OUTPUT
           fi
 
       - name: Build and push image
@@ -49,7 +56,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ steps.tag.outputs.tag }}
+          tags: ${{ steps.tag.outputs.image_tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -70,13 +77,13 @@ jobs:
             exit 1
           fi
 
-      - name: Upgrade Helm Chart (sha)
+      - name: Upgrade Helm Chart (dev)
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: 45.132.177.32
-          username: collab-user
+          host: ${{ vars.SSH_HOST }}
+          username: ${{ vars.SSH_USERNAME }}
           port: 22
-          key: ${{ secrets.SSH_PRIVATE_KEY || secrets.SSH_PRIVATE_KEY }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE_DEV || secrets.SSH_PASSPHRASE }}
           script: |
             helm upgrade --install auth-service \
@@ -84,7 +91,7 @@ jobs:
               -n collab \
               --atomic \
               --timeout 900s \
-              --set image.tag=${{ github.sha }}
+              --set image.tag=${{ needs.build-and-push.outputs.deploy_tag }}
 
             kubectl -n collab rollout restart deploy/collab-go-auth
 
@@ -105,14 +112,14 @@ jobs:
             exit 1
           fi
 
-      - name: Upgrade Helm Chart (latest)
+      - name: Upgrade Helm Chart (prod)
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: 213.171.26.208
-          username: collab-user
+          host: ${{ vars.SSH_HOST }}
+          username: ${{ vars.SSH_USERNAME }}
           port: 22
-          key: ${{ secrets.SSH_PRIVATE_KEY_PROD || secrets.SSH_PRIVATE_KEY }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE_PROD || secrets.SSH_PASSPHRASE }}
           script: |
-            helm upgrade --install auth-service "$HOME/collab-k8s-infra-temp/charts/apps/auth-service" -n collab --atomic --timeout 900s --set image.tag=latest
+            helm upgrade --install auth-service "$HOME/collab-k8s-infra-temp/charts/apps/auth-service" -n collab --atomic --timeout 900s --set image.tag=${{ needs.build-and-push.outputs.deploy_tag }}
             kubectl -n collab rollout restart deploy/collab-go-auth
