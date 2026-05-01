@@ -318,3 +318,15 @@ func (m *SMTPMailer) renderTemplate(name string, data interface{}) (string, erro
 	}
 	return buf.String(), nil
 }
+
+// NewMailer - фабрика, выбирает провайдера по конфигу
+func NewMailer(cfg *config.Config) (Mailer, error) {
+	switch cfg.Email.Provider {
+	case "resend":
+		return NewResend(cfg.Resend, cfg.SMTP)
+	case "smtp", "":
+		return New(cfg.SMTP)
+	default:
+		return nil, fmt.Errorf("unknown email provider: %q", cfg.Email.Provider)
+	}
+}

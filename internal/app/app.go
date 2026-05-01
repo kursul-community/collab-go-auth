@@ -60,11 +60,11 @@ func Run(cfg *config.Config, devMode bool) {
 	}
 
 	// Создаем email сервис для отправки писем
-	mailer, err := emailadapter.New(cfg.SMTP)
+	mailer, err := emailadapter.NewMailer(cfg)
 	if err != nil {
-		logger.Fatalf("Failed to initialize email service: %v", err)
+	    logger.Fatalf("Failed to initialize email service: %v", err)
 	}
-	logger.Printf("Email service initialized (SMTP: %s)", cfg.SMTP.Addr())
+	logger.Printf("Email service initialized (provider: %s)", cfg.Email.Provider)
 
 	// Инициализация клиента user-service
 	userSvcClient, err := userclient.NewClient(cfg.Services.UserService)

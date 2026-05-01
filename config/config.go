@@ -32,6 +32,21 @@ type (
 		Metrics       MetricsConfig       `yaml:"metrics"`       // Настройки метрик
 		OAuth         OAuthConfig         `yaml:"oauth"`         // Настройки OAuth2
 		Services      ServicesConfig      `yaml:"services"`      // Внешние сервисы
+		Email  EmailConfig  `yaml:"email"`  // Выбор провайдера email
+		Resend ResendConfig `yaml:"resend"` // Настройки Resend
+		SMTP   SMTPConfig   `yaml:"smtp"`   // Настройки SMTP (legacy)
+	}
+
+	// EmailConfig - выбор провайдера email
+	EmailConfig struct {
+	    Provider string `yaml:"provider" env:"EMAIL_PROVIDER" env-default:"smtp"` // smtp или resend
+	}
+
+	// ResendConfig - настройки Resend
+	ResendConfig struct {
+	    APIKey   string `yaml:"apiKey" env:"RESEND_API_KEY"`
+	    From     string `yaml:"from" env:"RESEND_FROM"`
+	    FromName string `yaml:"fromName" env:"RESEND_FROM_NAME"`
 	}
 
 	// ServicesConfig - структура конфига внешних сервисов
