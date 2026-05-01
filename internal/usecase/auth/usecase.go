@@ -333,23 +333,17 @@ func (uc *auth) VerifyEmail(userID string, requestID string, code string) error 
 		return ErrInvalidRequestID
 	}
 
-	// Тестовый код для разработки (можно использовать вместо реального кода из письма)
-	if code == "123456" {
-		log.Printf("[RequestID: %s] Using test verification code for user %s", requestID, userID)
-		// Пропускаем проверку кода из Redis и сразу верифицируем email
-	} else {
-		// Получаем код из Redis по userID
-		storedCode, err := uc.tokenRepo.GetVerificationCode(ctx, userID)
-		if err != nil {
-			log.Printf("[RequestID: %s] Failed to get verification code: %v", requestID, err)
-			return fmt.Errorf("failed to get verification code: %w", err)
-		}
+	// Получаем код из Redis по userID
+	storedCode, err := uc.tokenRepo.GetVerificationCode(ctx, userID)
+	if err != nil {
+		log.Printf("[RequestID: %s] Failed to get verification code: %v", requestID, err)
+		return fmt.Errorf("failed to get verification code: %w", err)
+	}
 
-		// Проверяем код
-		if storedCode == "" || storedCode != code {
-			log.Printf("[RequestID: %s] Invalid verification code for user %s", requestID, userID)
-			return ErrInvalidVerificationCode
-		}
+	// Проверяем код
+	if storedCode == "" || storedCode != code {
+		log.Printf("[RequestID: %s] Invalid verification code for user %s", requestID, userID)
+		return ErrInvalidVerificationCode
 	}
 
 	// Устанавливаем email_verified = true
