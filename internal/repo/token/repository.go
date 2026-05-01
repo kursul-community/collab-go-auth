@@ -2,6 +2,7 @@ package token
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 const (
 	accessTokenPrefix              = "access_token:"               // Префикс для активных access токенов
 	refreshTokenPrefix             = "refresh_token:"              // Префикс для refresh токенов
+	refreshReplacedPrefix          = "refresh_replaced:"           // Grace-window: oldToken → JSON{access, refresh}
 	userSessionsPrefix             = "user_sessions:"              // Префикс для списка сессий пользователя
 	userAccessTokens               = "user_access:"                // Префикс для списка access токенов пользователя
 	emailVerificationPrefix        = "email_verification:"         // Префикс для кодов верификации email
@@ -19,6 +21,11 @@ const (
 	passwordResetRequestPrefix     = "password_reset_request:"     // Префикс для requestID сброса пароля
 	oauthStatePrefix               = "oauth_state:"                // Префикс для OAuth state (CSRF защита)
 )
+
+type replacedRefreshTokens struct {
+	AccessToken  string `json:"access"`
+	RefreshToken string `json:"refresh"`
+}
 
 // Убедимся, что repository реализует интерфейс Repository
 var _ Repository = (*repository)(nil)
@@ -40,6 +47,14 @@ type Repository interface {
 	ValidateRefreshToken(ctx context.Context, userID string, token string) (bool, error)
 	// RevokeRefreshToken - отзыв refresh токена
 	RevokeRefreshToken(ctx context.Context, userID string, token string) error
+	// StoreReplacedRefreshToken - сохраняет (newAccess, newRefresh), выпущенные
+	// взамен oldToken, на короткий TTL. Используется для grace-window: если
+	// клиент потерял ответ на ротацию (deploy-disconnect, network-blip,
+	// multi-tab-race) — повторный запрос с тем же oldToken получает ту же пару.
+	StoreReplacedRefreshToken(ctx context.Context, oldToken, newAccessToken, newRefreshToken string, ttl time.Duration) error
+	// GetReplacedRefreshToken возвращает пару (access, refresh), записанную
+	// для oldToken в grace-window. ok=false когда записи нет / истекла.
+	GetReplacedRefreshToken(ctx context.Context, oldToken string) (string, string, bool, error)
 
 	// === Управление сессиями ===
 	// RevokeAllUserTokens - отзыв всех токенов пользователя (logout everywhere)
@@ -195,6 +210,41 @@ func (r *repository) RevokeRefreshToken(ctx context.Context, userID string, toke
 	}
 
 	return nil
+}
+
+// StoreReplacedRefreshToken сохраняет пару (access, refresh), выпущенную
+// взамен oldToken, в grace-окне. TTL короткий (порядка 10-30s). Если ответ
+// ротации потерян, повторный refresh с oldToken вернёт ту же пару вместо
+// логаута.
+func (r *repository) StoreReplacedRefreshToken(ctx context.Context, oldToken, newAccessToken, newRefreshToken string, ttl time.Duration) error {
+	payload, err := json.Marshal(replacedRefreshTokens{
+		AccessToken:  newAccessToken,
+		RefreshToken: newRefreshToken,
+	})
+	if err != nil {
+		return fmt.Errorf("marshal replaced refresh payload: %w", err)
+	}
+	if err := r.client.Set(ctx, refreshReplacedPrefix+oldToken, payload, ttl).Err(); err != nil {
+		return fmt.Errorf("store replaced refresh token: %w", err)
+	}
+	return nil
+}
+
+// GetReplacedRefreshToken возвращает пару (access, refresh), сохранённую при
+// предыдущей ротации oldToken. ok=false когда записи нет или истекла.
+func (r *repository) GetReplacedRefreshToken(ctx context.Context, oldToken string) (string, string, bool, error) {
+	raw, err := r.client.Get(ctx, refreshReplacedPrefix+oldToken).Result()
+	if err == redis.Nil {
+		return "", "", false, nil
+	}
+	if err != nil {
+		return "", "", false, fmt.Errorf("get replaced refresh token: %w", err)
+	}
+	var payload replacedRefreshTokens
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		return "", "", false, fmt.Errorf("unmarshal replaced refresh payload: %w", err)
+	}
+	return payload.AccessToken, payload.RefreshToken, true, nil
 }
 
 // RevokeAllUserTokens - отзыв всех токенов пользователя (access + refresh)

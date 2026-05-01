@@ -333,23 +333,17 @@ func (uc *auth) VerifyEmail(userID string, requestID string, code string) error 
 		return ErrInvalidRequestID
 	}
 
-	// Тестовый код для разработки (можно использовать вместо реального кода из письма)
-	if code == "123456" {
-		log.Printf("[RequestID: %s] Using test verification code for user %s", requestID, userID)
-		// Пропускаем проверку кода из Redis и сразу верифицируем email
-	} else {
-		// Получаем код из Redis по userID
-		storedCode, err := uc.tokenRepo.GetVerificationCode(ctx, userID)
-		if err != nil {
-			log.Printf("[RequestID: %s] Failed to get verification code: %v", requestID, err)
-			return fmt.Errorf("failed to get verification code: %w", err)
-		}
+	// Получаем код из Redis по userID
+	storedCode, err := uc.tokenRepo.GetVerificationCode(ctx, userID)
+	if err != nil {
+		log.Printf("[RequestID: %s] Failed to get verification code: %v", requestID, err)
+		return fmt.Errorf("failed to get verification code: %w", err)
+	}
 
-		// Проверяем код
-		if storedCode == "" || storedCode != code {
-			log.Printf("[RequestID: %s] Invalid verification code for user %s", requestID, userID)
-			return ErrInvalidVerificationCode
-		}
+	// Проверяем код
+	if storedCode == "" || storedCode != code {
+		log.Printf("[RequestID: %s] Invalid verification code for user %s", requestID, userID)
+		return ErrInvalidVerificationCode
 	}
 
 	// Устанавливаем email_verified = true
@@ -554,6 +548,12 @@ func (uc *auth) Login(email string, password string) (string, string, error) {
 	return accessToken, refreshToken, nil
 }
 
+// refreshGraceTTL — окно идемпотентности для retry-refresh после потерянного
+// ответа (deploy-disconnect, multi-tab race, network blip). В пределах этого
+// TTL повторный запрос с уже-ротированным токеном получает ту же пару, что
+// была выдана первому клиенту, вместо ErrRefreshTokenNotFound + логаута.
+const refreshGraceTTL = 30 * time.Second
+
 // RefreshToken - обновление токена
 func (uc *auth) RefreshToken(refreshToken string) (string, string, error) {
 	ctx := context.Background()
@@ -576,6 +576,11 @@ func (uc *auth) RefreshToken(refreshToken string) (string, string, error) {
 		return "", "", fmt.Errorf("failed to validate refresh token: %w", err)
 	}
 	if !exists {
+		// Возможно, это retry потерянной ротации — пара уже выпущена и лежит
+		// в grace-окне. Идемпотентно отдаём её, чтобы не выкидывать клиента.
+		if access, refresh, ok, lookupErr := uc.tokenRepo.GetReplacedRefreshToken(ctx, refreshToken); lookupErr == nil && ok {
+			return access, refresh, nil
+		}
 		return "", "", ErrRefreshTokenNotFound
 	}
 
@@ -607,6 +612,12 @@ func (uc *auth) RefreshToken(refreshToken string) (string, string, error) {
 	err = uc.tokenRepo.StoreRefreshToken(ctx, userID, newRefreshToken, uc.refreshTTL)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to store new refresh token: %w", err)
+	}
+
+	// Записываем grace-mapping ДО отзыва старого: если ответ потеряется и
+	// клиент придёт снова с тем же old, он получит ту же пару идемпотентно.
+	if storeErr := uc.tokenRepo.StoreReplacedRefreshToken(ctx, refreshToken, newAccessToken, newRefreshToken, refreshGraceTTL); storeErr != nil {
+		log.Printf("RefreshToken: failed to store replaced mapping: %v", storeErr)
 	}
 
 	// Отзываем старый refresh токен
