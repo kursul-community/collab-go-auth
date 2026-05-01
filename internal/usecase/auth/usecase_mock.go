@@ -75,6 +75,16 @@ func (m *MockTokenRepository) RevokeRefreshToken(ctx context.Context, userID str
 	return args.Error(0)
 }
 
+func (m *MockTokenRepository) StoreReplacedRefreshToken(ctx context.Context, oldToken, newAccessToken, newRefreshToken string, ttl time.Duration) error {
+	args := m.Called(ctx, oldToken, newAccessToken, newRefreshToken, ttl)
+	return args.Error(0)
+}
+
+func (m *MockTokenRepository) GetReplacedRefreshToken(ctx context.Context, oldToken string) (string, string, bool, error) {
+	args := m.Called(ctx, oldToken)
+	return args.String(0), args.String(1), args.Bool(2), args.Error(3)
+}
+
 // === Управление сессиями ===
 
 func (m *MockTokenRepository) RevokeAllUserTokens(ctx context.Context, userID string) error {
