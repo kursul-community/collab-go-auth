@@ -32,9 +32,8 @@ type (
 		Metrics       MetricsConfig       `yaml:"metrics"`       // Настройки метрик
 		OAuth         OAuthConfig         `yaml:"oauth"`         // Настройки OAuth2
 		Services      ServicesConfig      `yaml:"services"`      // Внешние сервисы
-		Email  EmailConfig  `yaml:"email"`  // Выбор провайдера email
-		Resend ResendConfig `yaml:"resend"` // Настройки Resend
-		SMTP   SMTPConfig   `yaml:"smtp"`   // Настройки SMTP (legacy)
+		Email  		  EmailConfig  		  `yaml:"email"`  // Выбор провайдера email
+		Resend 		  ResendConfig 		  `yaml:"resend"` // Настройки Resend
 	}
 
 	// EmailConfig - выбор провайдера email
