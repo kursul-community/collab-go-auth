@@ -21,6 +21,12 @@ proto-generate:
 generate-key:
 	go run cmd/generate-key/generate_key.go
 
+# Сборка email-шаблонов из MJML (обновляет templates/*.html)
+emails-build:
+	cd internal/adapter/email/templates && \
+		npx --yes mjml verification.mjml -o verification.html && \
+		npx --yes mjml password_reset.mjml -o password_reset.html
+
 # Запуск
 run:
 	go run $(ENTRY_POINT)/main.go
