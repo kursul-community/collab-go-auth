@@ -47,6 +47,13 @@ type Repository interface {
 	ValidateRefreshToken(ctx context.Context, userID string, token string) (bool, error)
 	// RevokeRefreshToken - отзыв refresh токена
 	RevokeRefreshToken(ctx context.Context, userID string, token string) error
+	// RotateRefreshToken атомарно (через Lua) проверяет, что refresh_token:{token}
+	// принадлежит userID, и сразу удаляет его. Используется на горячем пути
+	// ротации, чтобы убрать race-окно между Validate и Revoke: только один
+	// параллельный запрос становится winner. Возвращает true, если токен
+	// существовал и был успешно удалён; false — если токена нет (уже
+	// ротирован или никогда не сохранялся).
+	RotateRefreshToken(ctx context.Context, userID string, token string) (bool, error)
 	// StoreReplacedRefreshToken - сохраняет (newAccess, newRefresh), выпущенные
 	// взамен oldToken, на короткий TTL. Используется для grace-window: если
 	// клиент потерял ответ на ротацию (deploy-disconnect, network-blip,
@@ -210,6 +217,37 @@ func (r *repository) RevokeRefreshToken(ctx context.Context, userID string, toke
 	}
 
 	return nil
+}
+
+// rotateRefreshLua атомарно проверяет владельца refresh_token:{token} и
+// удаляет ключ + чистит вхождение в user_sessions:{userID}. Возвращает 1 при
+// успешной ротации, 0 если токена нет, -1 если userID не совпадает.
+var rotateRefreshLua = redis.NewScript(`
+local stored = redis.call('GET', KEYS[1])
+if not stored then
+    return 0
+end
+if stored ~= ARGV[1] then
+    return -1
+end
+redis.call('DEL', KEYS[1])
+redis.call('SREM', KEYS[2], ARGV[2])
+return 1
+`)
+
+// RotateRefreshToken атомарно валидирует и удаляет refresh-токен. Возвращает
+// true, если ключ был и был удалён нашей операцией (winner ротации); false,
+// если ключа нет либо он принадлежит другому userID. Реализовано через
+// Lua-скрипт, чтобы между GET и DEL не открывалось окно для параллельных
+// запросов.
+func (r *repository) RotateRefreshToken(ctx context.Context, userID, token string) (bool, error) {
+	tokenKey := refreshTokenPrefix + token
+	sessionsKey := userSessionsPrefix + userID
+	res, err := rotateRefreshLua.Run(ctx, r.client, []string{tokenKey, sessionsKey}, userID, token).Int()
+	if err != nil {
+		return false, fmt.Errorf("rotate refresh token: %w", err)
+	}
+	return res == 1, nil
 }
 
 // StoreReplacedRefreshToken сохраняет пару (access, refresh), выпущенную

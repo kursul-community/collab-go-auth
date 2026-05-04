@@ -75,6 +75,11 @@ func (m *MockTokenRepository) RevokeRefreshToken(ctx context.Context, userID str
 	return args.Error(0)
 }
 
+func (m *MockTokenRepository) RotateRefreshToken(ctx context.Context, userID string, token string) (bool, error) {
+	args := m.Called(ctx, userID, token)
+	return args.Bool(0), args.Error(1)
+}
+
 func (m *MockTokenRepository) StoreReplacedRefreshToken(ctx context.Context, oldToken, newAccessToken, newRefreshToken string, ttl time.Duration) error {
 	args := m.Called(ctx, oldToken, newAccessToken, newRefreshToken, ttl)
 	return args.Error(0)
