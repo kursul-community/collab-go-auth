@@ -4,10 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 )
+
+// authDebugTokenSuffix — last 8 chars for log correlation. [auth-debug] helper.
+func authDebugTokenSuffix(t string) string {
+	if len(t) > 8 {
+		return "..." + t[len(t)-8:]
+	}
+	return t
+}
 
 // Префиксы ключей в Redis
 const (
@@ -165,10 +174,12 @@ func (r *repository) RevokeAccessToken(ctx context.Context, userID string, token
 // StoreRefreshToken - сохранение refresh токена в Redis
 // Хранит токен и добавляет его в список сессий пользователя
 func (r *repository) StoreRefreshToken(ctx context.Context, userID string, token string, ttl time.Duration) error {
+	tokSfx := authDebugTokenSuffix(token)
 	// Сохраняем токен с привязкой к userID
 	tokenKey := refreshTokenPrefix + token
 	err := r.client.Set(ctx, tokenKey, userID, ttl).Err()
 	if err != nil {
+		log.Printf("[auth-debug] StoreRefreshToken: redis SET failed userID=%s token=%s err=%v", userID, tokSfx, err)
 		return fmt.Errorf("failed to store refresh token: %w", err)
 	}
 
@@ -176,12 +187,14 @@ func (r *repository) StoreRefreshToken(ctx context.Context, userID string, token
 	sessionsKey := userSessionsPrefix + userID
 	err = r.client.SAdd(ctx, sessionsKey, token).Err()
 	if err != nil {
+		log.Printf("[auth-debug] StoreRefreshToken: SADD failed userID=%s token=%s err=%v", userID, tokSfx, err)
 		return fmt.Errorf("failed to add token to user sessions: %w", err)
 	}
 
 	// Устанавливаем TTL для списка сессий (обновляем при каждом новом токене)
 	r.client.Expire(ctx, sessionsKey, ttl)
 
+	log.Printf("[auth-debug] StoreRefreshToken: STORED userID=%s token=%s ttl=%s", userID, tokSfx, ttl)
 	return nil
 }
 
@@ -243,9 +256,21 @@ return 1
 func (r *repository) RotateRefreshToken(ctx context.Context, userID, token string) (bool, error) {
 	tokenKey := refreshTokenPrefix + token
 	sessionsKey := userSessionsPrefix + userID
+	tokSfx := authDebugTokenSuffix(token)
 	res, err := rotateRefreshLua.Run(ctx, r.client, []string{tokenKey, sessionsKey}, userID, token).Int()
 	if err != nil {
+		log.Printf("[auth-debug] RotateRefreshToken: redis/lua error userID=%s token=%s err=%v", userID, tokSfx, err)
 		return false, fmt.Errorf("rotate refresh token: %w", err)
+	}
+	switch res {
+	case 1:
+		log.Printf("[auth-debug] RotateRefreshToken: lua=1 winner userID=%s token=%s", userID, tokSfx)
+	case 0:
+		log.Printf("[auth-debug] RotateRefreshToken: lua=0 token-missing userID=%s token=%s (key %q absent in redis — never stored, expired, or already rotated)", userID, tokSfx, tokenKey)
+	case -1:
+		log.Printf("[auth-debug] RotateRefreshToken: lua=-1 owner-mismatch userID=%s token=%s (key exists but belongs to different userID)", userID, tokSfx)
+	default:
+		log.Printf("[auth-debug] RotateRefreshToken: lua=%d unexpected userID=%s token=%s", res, userID, tokSfx)
 	}
 	return res == 1, nil
 }
@@ -271,17 +296,22 @@ func (r *repository) StoreReplacedRefreshToken(ctx context.Context, oldToken, ne
 // GetReplacedRefreshToken возвращает пару (access, refresh), сохранённую при
 // предыдущей ротации oldToken. ok=false когда записи нет или истекла.
 func (r *repository) GetReplacedRefreshToken(ctx context.Context, oldToken string) (string, string, bool, error) {
+	tokSfx := authDebugTokenSuffix(oldToken)
 	raw, err := r.client.Get(ctx, refreshReplacedPrefix+oldToken).Result()
 	if err == redis.Nil {
+		log.Printf("[auth-debug] GetReplacedRefreshToken: MISS oldTok=%s (no grace mapping)", tokSfx)
 		return "", "", false, nil
 	}
 	if err != nil {
+		log.Printf("[auth-debug] GetReplacedRefreshToken: redis error oldTok=%s err=%v", tokSfx, err)
 		return "", "", false, fmt.Errorf("get replaced refresh token: %w", err)
 	}
 	var payload replacedRefreshTokens
 	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		log.Printf("[auth-debug] GetReplacedRefreshToken: unmarshal error oldTok=%s err=%v", tokSfx, err)
 		return "", "", false, fmt.Errorf("unmarshal replaced refresh payload: %w", err)
 	}
+	log.Printf("[auth-debug] GetReplacedRefreshToken: HIT oldTok=%s newRefresh=%s", tokSfx, authDebugTokenSuffix(payload.RefreshToken))
 	return payload.AccessToken, payload.RefreshToken, true, nil
 }
 
