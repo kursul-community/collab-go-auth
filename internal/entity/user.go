@@ -10,9 +10,10 @@ type User struct {
 	CreatedAt       time.Time `json:"created_at"`        // Дата и время создания пользователя
 	IsActive        bool      `json:"is_active"`         // Флаг активности пользователя
 	EmailVerified   bool      `json:"email_verified"`    // Флаг подтверждения email
-	OAuthProvider   *string   `json:"oauth_provider"`    // OAuth провайдер (google, github, yandex, vk) или nil
-	OAuthProviderID *string   `json:"oauth_provider_id"` // ID пользователя у OAuth провайдера
-	Role            string    `json:"role"`              // Роль пользователя: "user" или "admin"
+	OAuthProvider    *string   `json:"oauth_provider"`     // OAuth провайдер (google, github, yandex, vk) или nil
+	OAuthProviderID  *string   `json:"oauth_provider_id"`  // ID пользователя у OAuth провайдера
+	Role             string    `json:"role"`               // Роль пользователя: "user" или "admin"
+	SubscriptionTier string    `json:"subscription_tier"`  // Уровень подписки: "member" — дефолт, расширяется когда появится billing-сервис
 }
 
 // IsOAuthUser - проверяет, является ли пользователь OAuth пользователем
