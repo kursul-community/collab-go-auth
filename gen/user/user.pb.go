@@ -10,6 +10,7 @@ import (
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	wrapperspb "google.golang.org/protobuf/types/known/wrapperspb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -83,15 +84,15 @@ func (x *Position) GetCategory() string {
 }
 
 type UserProfile struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	Username      string                 `protobuf:"bytes,2,opt,name=username,proto3" json:"username,omitempty"`
-	AboutInfo     string                 `protobuf:"bytes,3,opt,name=about_info,json=aboutInfo,proto3" json:"about_info,omitempty"`
-	GitUrl        string                 `protobuf:"bytes,4,opt,name=git_url,json=gitUrl,proto3" json:"git_url,omitempty"`
-	Position      string                 `protobuf:"bytes,5,opt,name=position,proto3" json:"position,omitempty"`
-	AvatarUrl     string                 `protobuf:"bytes,6,opt,name=avatar_url,json=avatarUrl,proto3" json:"avatar_url,omitempty"`
-	CreatedAt     string                 `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt     string                 `protobuf:"bytes,8,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	UserId        string                  `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Username      string                  `protobuf:"bytes,2,opt,name=username,proto3" json:"username,omitempty"`
+	AboutInfo     *wrapperspb.StringValue `protobuf:"bytes,3,opt,name=about_info,json=aboutInfo,proto3" json:"about_info,omitempty"`
+	GitUrl        string                  `protobuf:"bytes,4,opt,name=git_url,json=gitUrl,proto3" json:"git_url,omitempty"`
+	Position      string                  `protobuf:"bytes,5,opt,name=position,proto3" json:"position,omitempty"`
+	AvatarUrl     string                  `protobuf:"bytes,6,opt,name=avatar_url,json=avatarUrl,proto3" json:"avatar_url,omitempty"`
+	CreatedAt     string                  `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     string                  `protobuf:"bytes,8,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -140,11 +141,11 @@ func (x *UserProfile) GetUsername() string {
 	return ""
 }
 
-func (x *UserProfile) GetAboutInfo() string {
+func (x *UserProfile) GetAboutInfo() *wrapperspb.StringValue {
 	if x != nil {
 		return x.AboutInfo
 	}
-	return ""
+	return nil
 }
 
 func (x *UserProfile) GetGitUrl() string {
@@ -888,16 +889,16 @@ var File_user_proto protoreflect.FileDescriptor
 const file_user_proto_rawDesc = "" +
 	"\n" +
 	"\n" +
-	"user.proto\x12\x04user\x1a\x1cgoogle/api/annotations.proto\"J\n" +
+	"user.proto\x12\x04user\x1a\x1cgoogle/api/annotations.proto\x1a\x1egoogle/protobuf/wrappers.proto\"J\n" +
 	"\bPosition\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1a\n" +
-	"\bcategory\x18\x03 \x01(\tR\bcategory\"\xf3\x01\n" +
+	"\bcategory\x18\x03 \x01(\tR\bcategory\"\x91\x02\n" +
 	"\vUserProfile\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1a\n" +
-	"\busername\x18\x02 \x01(\tR\busername\x12\x1d\n" +
+	"\busername\x18\x02 \x01(\tR\busername\x12;\n" +
 	"\n" +
-	"about_info\x18\x03 \x01(\tR\taboutInfo\x12\x17\n" +
+	"about_info\x18\x03 \x01(\v2\x1c.google.protobuf.StringValueR\taboutInfo\x12\x17\n" +
 	"\agit_url\x18\x04 \x01(\tR\x06gitUrl\x12\x1a\n" +
 	"\bposition\x18\x05 \x01(\tR\bposition\x12\x1d\n" +
 	"\n" +
@@ -967,48 +968,50 @@ func file_user_proto_rawDescGZIP() []byte {
 
 var file_user_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_user_proto_goTypes = []any{
-	(*Position)(nil),              // 0: user.Position
-	(*UserProfile)(nil),           // 1: user.UserProfile
-	(*UpdateProfileRequest)(nil),  // 2: user.UpdateProfileRequest
-	(*UpdateProfileResponse)(nil), // 3: user.UpdateProfileResponse
-	(*GetMyProfileRequest)(nil),   // 4: user.GetMyProfileRequest
-	(*GetMyProfileResponse)(nil),  // 5: user.GetMyProfileResponse
-	(*GetProfileRequest)(nil),     // 6: user.GetProfileRequest
-	(*GetProfileByIDRequest)(nil), // 7: user.GetProfileByIDRequest
-	(*UpdateGitURLRequest)(nil),   // 8: user.UpdateGitURLRequest
-	(*UpdateGitURLResponse)(nil),  // 9: user.UpdateGitURLResponse
-	(*GetProfileResponse)(nil),    // 10: user.GetProfileResponse
-	(*GetPositionsRequest)(nil),   // 11: user.GetPositionsRequest
-	(*GetPositionsResponse)(nil),  // 12: user.GetPositionsResponse
-	(*SyncAuthUserRequest)(nil),   // 13: user.SyncAuthUserRequest
-	(*SyncAuthUserResponse)(nil),  // 14: user.SyncAuthUserResponse
-	(*GetUserStatusRequest)(nil),  // 15: user.GetUserStatusRequest
-	(*GetUserStatusResponse)(nil), // 16: user.GetUserStatusResponse
+	(*Position)(nil),               // 0: user.Position
+	(*UserProfile)(nil),            // 1: user.UserProfile
+	(*UpdateProfileRequest)(nil),   // 2: user.UpdateProfileRequest
+	(*UpdateProfileResponse)(nil),  // 3: user.UpdateProfileResponse
+	(*GetMyProfileRequest)(nil),    // 4: user.GetMyProfileRequest
+	(*GetMyProfileResponse)(nil),   // 5: user.GetMyProfileResponse
+	(*GetProfileRequest)(nil),      // 6: user.GetProfileRequest
+	(*GetProfileByIDRequest)(nil),  // 7: user.GetProfileByIDRequest
+	(*UpdateGitURLRequest)(nil),    // 8: user.UpdateGitURLRequest
+	(*UpdateGitURLResponse)(nil),   // 9: user.UpdateGitURLResponse
+	(*GetProfileResponse)(nil),     // 10: user.GetProfileResponse
+	(*GetPositionsRequest)(nil),    // 11: user.GetPositionsRequest
+	(*GetPositionsResponse)(nil),   // 12: user.GetPositionsResponse
+	(*SyncAuthUserRequest)(nil),    // 13: user.SyncAuthUserRequest
+	(*SyncAuthUserResponse)(nil),   // 14: user.SyncAuthUserResponse
+	(*GetUserStatusRequest)(nil),   // 15: user.GetUserStatusRequest
+	(*GetUserStatusResponse)(nil),  // 16: user.GetUserStatusResponse
+	(*wrapperspb.StringValue)(nil), // 17: google.protobuf.StringValue
 }
 var file_user_proto_depIdxs = []int32{
-	1,  // 0: user.GetMyProfileResponse.profile:type_name -> user.UserProfile
-	1,  // 1: user.GetProfileResponse.profile:type_name -> user.UserProfile
-	2,  // 2: user.UserService.CreateProfile:input_type -> user.UpdateProfileRequest
-	4,  // 3: user.UserService.GetMyProfile:input_type -> user.GetMyProfileRequest
-	6,  // 4: user.UserService.GetProfile:input_type -> user.GetProfileRequest
-	7,  // 5: user.UserService.GetProfileByID:input_type -> user.GetProfileByIDRequest
-	8,  // 6: user.UserService.UpdateGitURL:input_type -> user.UpdateGitURLRequest
-	11, // 7: user.UserService.GetPositions:input_type -> user.GetPositionsRequest
-	13, // 8: user.UserService.SyncAuthUser:input_type -> user.SyncAuthUserRequest
-	15, // 9: user.UserService.GetUserStatus:input_type -> user.GetUserStatusRequest
-	3,  // 10: user.UserService.CreateProfile:output_type -> user.UpdateProfileResponse
-	5,  // 11: user.UserService.GetMyProfile:output_type -> user.GetMyProfileResponse
-	10, // 12: user.UserService.GetProfile:output_type -> user.GetProfileResponse
-	10, // 13: user.UserService.GetProfileByID:output_type -> user.GetProfileResponse
-	9,  // 14: user.UserService.UpdateGitURL:output_type -> user.UpdateGitURLResponse
-	12, // 15: user.UserService.GetPositions:output_type -> user.GetPositionsResponse
-	14, // 16: user.UserService.SyncAuthUser:output_type -> user.SyncAuthUserResponse
-	16, // 17: user.UserService.GetUserStatus:output_type -> user.GetUserStatusResponse
-	10, // [10:18] is the sub-list for method output_type
-	2,  // [2:10] is the sub-list for method input_type
-	2,  // [2:2] is the sub-list for extension type_name
-	2,  // [2:2] is the sub-list for extension extendee
-	0,  // [0:2] is the sub-list for field type_name
+	17, // 0: user.UserProfile.about_info:type_name -> google.protobuf.StringValue
+	1,  // 1: user.GetMyProfileResponse.profile:type_name -> user.UserProfile
+	1,  // 2: user.GetProfileResponse.profile:type_name -> user.UserProfile
+	2,  // 3: user.UserService.CreateProfile:input_type -> user.UpdateProfileRequest
+	4,  // 4: user.UserService.GetMyProfile:input_type -> user.GetMyProfileRequest
+	6,  // 5: user.UserService.GetProfile:input_type -> user.GetProfileRequest
+	7,  // 6: user.UserService.GetProfileByID:input_type -> user.GetProfileByIDRequest
+	8,  // 7: user.UserService.UpdateGitURL:input_type -> user.UpdateGitURLRequest
+	11, // 8: user.UserService.GetPositions:input_type -> user.GetPositionsRequest
+	13, // 9: user.UserService.SyncAuthUser:input_type -> user.SyncAuthUserRequest
+	15, // 10: user.UserService.GetUserStatus:input_type -> user.GetUserStatusRequest
+	3,  // 11: user.UserService.CreateProfile:output_type -> user.UpdateProfileResponse
+	5,  // 12: user.UserService.GetMyProfile:output_type -> user.GetMyProfileResponse
+	10, // 13: user.UserService.GetProfile:output_type -> user.GetProfileResponse
+	10, // 14: user.UserService.GetProfileByID:output_type -> user.GetProfileResponse
+	9,  // 15: user.UserService.UpdateGitURL:output_type -> user.UpdateGitURLResponse
+	12, // 16: user.UserService.GetPositions:output_type -> user.GetPositionsResponse
+	14, // 17: user.UserService.SyncAuthUser:output_type -> user.SyncAuthUserResponse
+	16, // 18: user.UserService.GetUserStatus:output_type -> user.GetUserStatusResponse
+	11, // [11:19] is the sub-list for method output_type
+	3,  // [3:11] is the sub-list for method input_type
+	3,  // [3:3] is the sub-list for extension type_name
+	3,  // [3:3] is the sub-list for extension extendee
+	0,  // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_user_proto_init() }
