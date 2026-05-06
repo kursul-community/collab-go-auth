@@ -554,6 +554,15 @@ func (uc *auth) Login(email string, password string) (string, string, error) {
 // была выдана первому клиенту, вместо ErrRefreshTokenNotFound + логаута.
 const refreshGraceTTL = 30 * time.Second
 
+// tokenSuffix returns last 8 chars for log correlation (full token never logged).
+// [auth-debug] helper — удалить вместе с остальными auth-debug логами.
+func tokenSuffix(t string) string {
+	if len(t) > 8 {
+		return "..." + t[len(t)-8:]
+	}
+	return t
+}
+
 // graceLookupBackoffs — короткий poll-loop для проигравших гонку запросов.
 // Winner ротации тратит ~50-150 мс на bcrypt + JWT-sign + Redis-writes до
 // публикации grace-mapping. Loser, попавший сюда сразу после atomic-rotate
@@ -570,16 +579,21 @@ var graceLookupBackoffs = []time.Duration{
 // RefreshToken - обновление токена
 func (uc *auth) RefreshToken(refreshToken string) (string, string, error) {
 	ctx := context.Background()
+	startedAt := time.Now()
+	tokSfx := tokenSuffix(refreshToken)
+	log.Printf("[auth-debug] RefreshToken: ENTRY token=%s len=%d", tokSfx, len(refreshToken))
 
 	// Проверяем валидность JWT токена (подпись и срок действия)
 	isValid, err := uc.tokenService.ValidateToken(refreshToken)
 	if !isValid || err != nil {
+		log.Printf("[auth-debug] RefreshToken: REJECT invalid JWT token=%s valid=%v err=%v", tokSfx, isValid, err)
 		return "", "", ErrInvalidRefreshToken
 	}
 
 	// Получаем userID из токена
 	userID, err := uc.tokenService.GetUserIDFromToken(refreshToken)
 	if err != nil {
+		log.Printf("[auth-debug] RefreshToken: REJECT cannot extract userID token=%s err=%v", tokSfx, err)
 		return "", "", ErrInvalidRefreshToken
 	}
 
@@ -587,17 +601,23 @@ func (uc *auth) RefreshToken(refreshToken string) (string, string, error) {
 	// (параллельный или retry уже-ротированного токена) попадает в grace.
 	rotated, err := uc.tokenRepo.RotateRefreshToken(ctx, userID, refreshToken)
 	if err != nil {
+		log.Printf("[auth-debug] RefreshToken: ROTATE redis error userID=%s token=%s err=%v", userID, tokSfx, err)
 		return "", "", fmt.Errorf("failed to rotate refresh token: %w", err)
 	}
 	if !rotated {
+		log.Printf("[auth-debug] RefreshToken: ROTATE loser (token already rotated or never stored) userID=%s token=%s — entering grace lookup", userID, tokSfx)
 		// Token либо уже ротирован параллельным запросом / прошлым retry,
 		// либо его никогда не было. Идемпотентно отдаём пару, выпущенную
 		// winner'ом, если она ещё в grace-окне.
 		if access, refresh, ok := uc.waitForReplacedRefreshToken(ctx, refreshToken); ok {
+			log.Printf("[auth-debug] RefreshToken: GRACE hit userID=%s oldTok=%s newRefresh=%s totalMs=%d", userID, tokSfx, tokenSuffix(refresh), time.Since(startedAt).Milliseconds())
+			_ = access
 			return access, refresh, nil
 		}
+		log.Printf("[auth-debug] RefreshToken: RESULT ErrRefreshTokenNotFound userID=%s token=%s totalMs=%d (loser, grace miss)", userID, tokSfx, time.Since(startedAt).Milliseconds())
 		return "", "", ErrRefreshTokenNotFound
 	}
+	log.Printf("[auth-debug] RefreshToken: ROTATE winner userID=%s token=%s", userID, tokSfx)
 
 	// Получаем данные пользователя для генерации новых токенов
 	curUser, err := uc.userRepo.GetUserById(ctx, userID)
@@ -631,9 +651,12 @@ func (uc *auth) RefreshToken(refreshToken string) (string, string, error) {
 	// токеном получит ту же пару вместо логаута. Старый токен уже удалён
 	// атомарно в RotateRefreshToken, отдельный Revoke не нужен.
 	if storeErr := uc.tokenRepo.StoreReplacedRefreshToken(ctx, refreshToken, newAccessToken, newRefreshToken, refreshGraceTTL); storeErr != nil {
-		log.Printf("RefreshToken: failed to store replaced mapping: %v", storeErr)
+		log.Printf("[auth-debug] RefreshToken: GRACE store failed userID=%s oldTok=%s err=%v", userID, tokSfx, storeErr)
+	} else {
+		log.Printf("[auth-debug] RefreshToken: GRACE published userID=%s oldTok=%s newRefresh=%s ttl=%s", userID, tokSfx, tokenSuffix(newRefreshToken), refreshGraceTTL)
 	}
 
+	log.Printf("[auth-debug] RefreshToken: SUCCESS userID=%s oldTok=%s newAccess=%s newRefresh=%s totalMs=%d", userID, tokSfx, tokenSuffix(newAccessToken), tokenSuffix(newRefreshToken), time.Since(startedAt).Milliseconds())
 	return newAccessToken, newRefreshToken, nil
 }
 
@@ -643,55 +666,68 @@ func (uc *auth) RefreshToken(refreshToken string) (string, string, error) {
 // истёк, либо winner упал, либо запрос пришёл с никогда не существовавшим
 // токеном.
 func (uc *auth) waitForReplacedRefreshToken(ctx context.Context, oldToken string) (string, string, bool) {
-	for _, delay := range graceLookupBackoffs {
+	tokSfx := tokenSuffix(oldToken)
+	for i, delay := range graceLookupBackoffs {
 		if delay > 0 {
 			select {
 			case <-ctx.Done():
+				log.Printf("[auth-debug] RefreshToken: GRACE poll ctx cancelled oldTok=%s attempt=%d", tokSfx, i)
 				return "", "", false
 			case <-time.After(delay):
 			}
 		}
 		access, refresh, ok, err := uc.tokenRepo.GetReplacedRefreshToken(ctx, oldToken)
 		if err != nil {
-			log.Printf("RefreshToken: grace lookup failed: %v", err)
+			log.Printf("[auth-debug] RefreshToken: GRACE lookup redis error oldTok=%s attempt=%d err=%v", tokSfx, i, err)
 			return "", "", false
 		}
 		if ok {
+			log.Printf("[auth-debug] RefreshToken: GRACE poll found oldTok=%s attempt=%d delayMs=%d", tokSfx, i, delay.Milliseconds())
 			return access, refresh, true
 		}
+		log.Printf("[auth-debug] RefreshToken: GRACE poll miss oldTok=%s attempt=%d delayMs=%d", tokSfx, i, delay.Milliseconds())
 	}
+	log.Printf("[auth-debug] RefreshToken: GRACE poll exhausted oldTok=%s (all %d attempts missed)", tokSfx, len(graceLookupBackoffs))
 	return "", "", false
 }
 
 // Logout - завершение сессии: отзывает refresh токен и связанные access токены пользователя
 func (uc *auth) Logout(refreshToken string) error {
 	ctx := context.Background()
+	tokSfx := tokenSuffix(refreshToken)
+	log.Printf("[auth-debug] Logout: ENTRY token=%s len=%d", tokSfx, len(refreshToken))
 
 	// Проверяем валидность JWT токена (подпись и срок действия)
 	isValid, err := uc.tokenService.ValidateToken(refreshToken)
 	if !isValid || err != nil {
+		log.Printf("[auth-debug] Logout: REJECT invalid JWT token=%s valid=%v err=%v", tokSfx, isValid, err)
 		return ErrInvalidRefreshToken
 	}
 
 	// Получаем userID из токена
 	userID, err := uc.tokenService.GetUserIDFromToken(refreshToken)
 	if err != nil {
+		log.Printf("[auth-debug] Logout: REJECT cannot extract userID token=%s err=%v", tokSfx, err)
 		return ErrInvalidRefreshToken
 	}
 
 	// Проверяем, что refresh токен существует в Redis (не был отозван)
 	exists, err := uc.tokenRepo.ValidateRefreshToken(ctx, userID, refreshToken)
 	if err != nil {
+		log.Printf("[auth-debug] Logout: ValidateRefreshToken redis error userID=%s token=%s err=%v", userID, tokSfx, err)
 		return fmt.Errorf("failed to validate refresh token: %w", err)
 	}
 	if !exists {
+		log.Printf("[auth-debug] Logout: RESULT ErrRefreshTokenNotFound userID=%s token=%s (token absent in redis)", userID, tokSfx)
 		return ErrRefreshTokenNotFound
 	}
 
 	// Отзываем все токены пользователя (access + refresh) для полного выхода
 	if err := uc.tokenRepo.RevokeAllUserTokens(ctx, userID); err != nil {
+		log.Printf("[auth-debug] Logout: RevokeAllUserTokens redis error userID=%s token=%s err=%v", userID, tokSfx, err)
 		return fmt.Errorf("failed to revoke user tokens: %w", err)
 	}
+	log.Printf("[auth-debug] Logout: SUCCESS userID=%s token=%s (all sessions revoked)", userID, tokSfx)
 
 	return nil
 }

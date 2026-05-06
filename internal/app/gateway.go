@@ -525,6 +525,34 @@ func cookieMiddleware(cfg *config.Config, next http.Handler) http.Handler {
 			return
 		}
 
+		// [auth-debug] log incoming refresh/logout cookie state — KEY DIAGNOSTIC
+		if isRefreshPath || isLogoutPath {
+			refreshCookie, refreshErr := r.Cookie(RefreshTokenCookieName)
+			accessCookie, accessErr := r.Cookie(AccessTokenCookieName)
+			rawCookieHeader := r.Header.Get("Cookie")
+			refreshSfx := "<absent>"
+			refreshLen := 0
+			if refreshErr == nil && refreshCookie != nil {
+				v := refreshCookie.Value
+				refreshLen = len(v)
+				if len(v) > 8 {
+					refreshSfx = "..." + v[len(v)-8:]
+				} else {
+					refreshSfx = v
+				}
+			}
+			accessSfx := "<absent>"
+			if accessErr == nil && accessCookie != nil {
+				v := accessCookie.Value
+				if len(v) > 8 {
+					accessSfx = "..." + v[len(v)-8:]
+				} else {
+					accessSfx = v
+				}
+			}
+			log.Printf("[auth-debug] cookieMiddleware: incoming path=%s ua=%q origin=%q refreshCookie=%s refreshLen=%d accessCookie=%s rawCookieHeaderLen=%d", path, r.Header.Get("User-Agent"), r.Header.Get("Origin"), refreshSfx, refreshLen, accessSfx, len(rawCookieHeader))
+		}
+
 		// Создаем буферизированный ResponseWriter
 		bw := &bufferedResponseWriter{
 			ResponseWriter: w,
@@ -610,10 +638,29 @@ func cookieMiddleware(cfg *config.Config, next http.Handler) http.Handler {
 								SameSite: sameSite,
 								MaxAge:   RefreshTokenMaxAge,
 							})
+							// [auth-debug] log issued tokens for correlation
+							accSfx := ""
+							if len(accessToken) > 8 {
+								accSfx = "..." + accessToken[len(accessToken)-8:]
+							}
+							refSfx := ""
+							if len(refreshToken) > 8 {
+								refSfx = "..." + refreshToken[len(refreshToken)-8:]
+							}
+							log.Printf("[auth-debug] cookieMiddleware: SET-COOKIE issued path=%s status=%d access=%s refresh=%s sameSite=%v secure=%v", path, bw.statusCode, accSfx, refSfx, sameSite, isProd)
 						}
 					}
 				}
 			}
+		}
+
+		// [auth-debug] log non-success response on refresh/logout — KEY for finding why user got logged out
+		if (isRefreshPath || isLogoutPath) && bw.statusCode != 0 && bw.statusCode != http.StatusOK && bw.statusCode != 209 {
+			body := bw.buf.String()
+			if len(body) > 300 {
+				body = body[:300] + "...(truncated)"
+			}
+			log.Printf("[auth-debug] cookieMiddleware: outgoing FAIL path=%s status=%d body=%q", path, bw.statusCode, body)
 		}
 
 		// Копируем заголовки и записываем ответ
