@@ -3,6 +3,7 @@ syntax = "proto3";
 package user;
 
 import "google/api/annotations.proto";
+import "google/protobuf/wrappers.proto";
 
 option go_package = "collab-user-service/gen/user";
 
@@ -69,7 +70,7 @@ message Position {
 message UserProfile {
   string user_id = 1;
   string username = 2;
-  string about_info = 3;
+  google.protobuf.StringValue about_info = 3;
   string git_url = 4;
   string position = 5;
   string avatar_url = 6;
