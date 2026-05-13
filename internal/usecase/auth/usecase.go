@@ -554,6 +554,19 @@ func (uc *auth) Login(email string, password string) (string, string, error) {
 // была выдана первому клиенту, вместо ErrRefreshTokenNotFound + логаута.
 const refreshGraceTTL = 30 * time.Second
 
+// graceLookupBackoffs — короткий poll-loop для проигравших гонку запросов.
+// Winner ротации тратит ~50-150 мс на bcrypt + JWT-sign + Redis-writes до
+// публикации grace-mapping. Loser, попавший сюда сразу после atomic-rotate
+// winner'а (DEL), может прийти РАНЬШЕ публикации mapping — короткий poll
+// закрывает это под-секундное окно без 401. Максимум ~600 мс ожидания.
+var graceLookupBackoffs = []time.Duration{
+	0,
+	50 * time.Millisecond,
+	100 * time.Millisecond,
+	150 * time.Millisecond,
+	300 * time.Millisecond,
+}
+
 // RefreshToken - обновление токена
 func (uc *auth) RefreshToken(refreshToken string) (string, string, error) {
 	ctx := context.Background()
@@ -570,15 +583,17 @@ func (uc *auth) RefreshToken(refreshToken string) (string, string, error) {
 		return "", "", ErrInvalidRefreshToken
 	}
 
-	// Проверяем, что refresh токен существует в Redis (не был отозван)
-	exists, err := uc.tokenRepo.ValidateRefreshToken(ctx, userID, refreshToken)
+	// Атомарный GET+DEL: только winner ротации проходит дальше. Loser
+	// (параллельный или retry уже-ротированного токена) попадает в grace.
+	rotated, err := uc.tokenRepo.RotateRefreshToken(ctx, userID, refreshToken)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to validate refresh token: %w", err)
+		return "", "", fmt.Errorf("failed to rotate refresh token: %w", err)
 	}
-	if !exists {
-		// Возможно, это retry потерянной ротации — пара уже выпущена и лежит
-		// в grace-окне. Идемпотентно отдаём её, чтобы не выкидывать клиента.
-		if access, refresh, ok, lookupErr := uc.tokenRepo.GetReplacedRefreshToken(ctx, refreshToken); lookupErr == nil && ok {
+	if !rotated {
+		// Token либо уже ротирован параллельным запросом / прошлым retry,
+		// либо его никогда не было. Идемпотентно отдаём пару, выпущенную
+		// winner'ом, если она ещё в grace-окне.
+		if access, refresh, ok := uc.waitForReplacedRefreshToken(ctx, refreshToken); ok {
 			return access, refresh, nil
 		}
 		return "", "", ErrRefreshTokenNotFound
@@ -603,27 +618,49 @@ func (uc *auth) RefreshToken(refreshToken string) (string, string, error) {
 	}
 
 	// Сохраняем новый access токен в Redis
-	err = uc.tokenRepo.StoreAccessToken(ctx, userID, newAccessToken, uc.accessTTL)
-	if err != nil {
+	if err := uc.tokenRepo.StoreAccessToken(ctx, userID, newAccessToken, uc.accessTTL); err != nil {
 		return "", "", fmt.Errorf("failed to store new access token: %w", err)
 	}
 
 	// Сохраняем новый refresh токен в Redis
-	err = uc.tokenRepo.StoreRefreshToken(ctx, userID, newRefreshToken, uc.refreshTTL)
-	if err != nil {
+	if err := uc.tokenRepo.StoreRefreshToken(ctx, userID, newRefreshToken, uc.refreshTTL); err != nil {
 		return "", "", fmt.Errorf("failed to store new refresh token: %w", err)
 	}
 
-	// Записываем grace-mapping ДО отзыва старого: если ответ потеряется и
-	// клиент придёт снова с тем же old, он получит ту же пару идемпотентно.
+	// Публикуем grace-mapping: параллельный/повторный запрос со старым
+	// токеном получит ту же пару вместо логаута. Старый токен уже удалён
+	// атомарно в RotateRefreshToken, отдельный Revoke не нужен.
 	if storeErr := uc.tokenRepo.StoreReplacedRefreshToken(ctx, refreshToken, newAccessToken, newRefreshToken, refreshGraceTTL); storeErr != nil {
 		log.Printf("RefreshToken: failed to store replaced mapping: %v", storeErr)
 	}
 
-	// Отзываем старый refresh токен
-	_ = uc.tokenRepo.RevokeRefreshToken(ctx, userID, refreshToken)
-
 	return newAccessToken, newRefreshToken, nil
+}
+
+// waitForReplacedRefreshToken опрашивает grace-mapping в коротких бэкоффах,
+// чтобы поймать пару, выпущенную параллельным winner'ом ротации. Возвращает
+// false, если до конца цикла mapping не появился — это значит либо grace
+// истёк, либо winner упал, либо запрос пришёл с никогда не существовавшим
+// токеном.
+func (uc *auth) waitForReplacedRefreshToken(ctx context.Context, oldToken string) (string, string, bool) {
+	for _, delay := range graceLookupBackoffs {
+		if delay > 0 {
+			select {
+			case <-ctx.Done():
+				return "", "", false
+			case <-time.After(delay):
+			}
+		}
+		access, refresh, ok, err := uc.tokenRepo.GetReplacedRefreshToken(ctx, oldToken)
+		if err != nil {
+			log.Printf("RefreshToken: grace lookup failed: %v", err)
+			return "", "", false
+		}
+		if ok {
+			return access, refresh, true
+		}
+	}
+	return "", "", false
 }
 
 // Logout - завершение сессии: отзывает refresh токен и связанные access токены пользователя

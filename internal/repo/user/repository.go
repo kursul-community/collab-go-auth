@@ -30,6 +30,9 @@ type Repository interface {
 	LinkOAuthProvider(ctx context.Context, userID, provider, providerID string) error
 	// DeleteUser - удаление пользователя по ID
 	DeleteUser(ctx context.Context, userID string) error
+	// GetSubscriptionTier - точечное чтение subscription_tier (используется handler-ом /session-info,
+	// чтобы не вытягивать всю строку юзера ради одного поля)
+	GetSubscriptionTier(ctx context.Context, userID string) (string, error)
 }
 
 // repository - репозиторий для работы с PostgreSQL
@@ -53,14 +56,14 @@ func (r *repository) CreateUser(ctx context.Context, user *entity.User) (string,
 }
 
 func (r *repository) GetUserByEmail(ctx context.Context, email string) (*entity.User, error) {
-	query := `SELECT id, email, password, is_active, email_verified, oauth_provider, oauth_provider_id, role FROM users WHERE email = $1`
+	query := `SELECT id, email, password, is_active, email_verified, oauth_provider, oauth_provider_id, role, subscription_tier FROM users WHERE email = $1`
 	row := r.db.QueryRow(ctx, query, email)
 
 	var user entity.User
 	var password *string
 
 	if err := row.Scan(&user.ID, &user.Email, &password, &user.IsActive, &user.EmailVerified,
-		&user.OAuthProvider, &user.OAuthProviderID, &user.Role); err != nil {
+		&user.OAuthProvider, &user.OAuthProviderID, &user.Role, &user.SubscriptionTier); err != nil {
 		return nil, err
 	}
 	if password != nil {
@@ -70,14 +73,14 @@ func (r *repository) GetUserByEmail(ctx context.Context, email string) (*entity.
 }
 
 func (r *repository) GetUserById(ctx context.Context, id string) (*entity.User, error) {
-	query := `SELECT id, email, password, is_active, email_verified, oauth_provider, oauth_provider_id, role FROM users WHERE id = $1`
+	query := `SELECT id, email, password, is_active, email_verified, oauth_provider, oauth_provider_id, role, subscription_tier FROM users WHERE id = $1`
 	row := r.db.QueryRow(ctx, query, id)
 
 	var user entity.User
 	var password *string
 
 	if err := row.Scan(&user.ID, &user.Email, &password, &user.IsActive, &user.EmailVerified,
-		&user.OAuthProvider, &user.OAuthProviderID, &user.Role); err != nil {
+		&user.OAuthProvider, &user.OAuthProviderID, &user.Role, &user.SubscriptionTier); err != nil {
 		return nil, err
 	}
 	if password != nil {
@@ -102,7 +105,7 @@ func (r *repository) UpdatePassword(ctx context.Context, userID string, hashedPa
 
 // GetUserByOAuthProvider - получение пользователя по OAuth провайдеру и ID у провайдера
 func (r *repository) GetUserByOAuthProvider(ctx context.Context, provider, providerID string) (*entity.User, error) {
-	query := `SELECT id, email, password, is_active, email_verified, oauth_provider, oauth_provider_id, role
+	query := `SELECT id, email, password, is_active, email_verified, oauth_provider, oauth_provider_id, role, subscription_tier
 		FROM users WHERE oauth_provider = $1 AND oauth_provider_id = $2`
 	row := r.db.QueryRow(ctx, query, provider, providerID)
 
@@ -110,7 +113,7 @@ func (r *repository) GetUserByOAuthProvider(ctx context.Context, provider, provi
 	var password *string
 
 	if err := row.Scan(&user.ID, &user.Email, &password, &user.IsActive, &user.EmailVerified,
-		&user.OAuthProvider, &user.OAuthProviderID, &user.Role); err != nil {
+		&user.OAuthProvider, &user.OAuthProviderID, &user.Role, &user.SubscriptionTier); err != nil {
 		return nil, err
 	}
 	if password != nil {
@@ -143,4 +146,14 @@ func (r *repository) DeleteUser(ctx context.Context, userID string) error {
 	query := `DELETE FROM users WHERE id = $1`
 	_, err := r.db.Exec(ctx, query, userID)
 	return err
+}
+
+// GetSubscriptionTier - читает только subscription_tier (для hot-path /session-info handler-а).
+func (r *repository) GetSubscriptionTier(ctx context.Context, userID string) (string, error) {
+	const query = `SELECT subscription_tier FROM users WHERE id = $1`
+	var tier string
+	if err := r.db.QueryRow(ctx, query, userID).Scan(&tier); err != nil {
+		return "", err
+	}
+	return tier, nil
 }
