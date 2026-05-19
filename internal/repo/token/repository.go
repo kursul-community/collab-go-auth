@@ -3,7 +3,9 @@ package token
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -12,20 +14,75 @@ import (
 // Префиксы ключей в Redis
 const (
 	accessTokenPrefix              = "access_token:"               // Префикс для активных access токенов
-	refreshTokenPrefix             = "refresh_token:"              // Префикс для refresh токенов
-	refreshReplacedPrefix          = "refresh_replaced:"           // Grace-window: oldToken → JSON{access, refresh}
-	userSessionsPrefix             = "user_sessions:"              // Префикс для списка сессий пользователя
+	refreshTokenPrefix             = "refresh_token:"              // Префикс для refresh токенов (legacy)
+	refreshReplacedPrefix          = "refresh_replaced:"           // Legacy grace-window: oldToken → JSON{access, refresh}
+	userSessionsPrefix             = "user_sessions:"              // Префикс для списка сессий пользователя (legacy)
 	userAccessTokens               = "user_access:"                // Префикс для списка access токенов пользователя
 	emailVerificationPrefix        = "email_verification:"         // Префикс для кодов верификации email
 	emailVerificationRequestPrefix = "email_verification_request:" // Префикс для requestID верификации email
 	passwordResetRequestPrefix     = "password_reset_request:"     // Префикс для requestID сброса пароля
 	oauthStatePrefix               = "oauth_state:"                // Префикс для OAuth state (CSRF защита)
+
+	// === Refresh token family (OAuth 2.0 Security BCP §4.13) ===
+	refreshCurrentPrefix = "refresh_current:" // family_id → JSON{access, refresh, user_id, created_at}
+	refreshFamilyPrefix  = "refresh_family:"  // refresh_jwt → family_id (обратный индекс)
+	userFamiliesPrefix   = "user_families:"   // user_id → SET<family_id>
+	revokedFamilyPrefix  = "revoked_family:"  // family_id → "1" (флаг compromised)
+)
+
+// Sentinel-ошибки для операций над семьями refresh-токенов
+var (
+	ErrFamilyNotFound = errors.New("token family not found")
+	ErrFamilyRevoked  = errors.New("token family revoked")
+	ErrFamilyConflict = errors.New("token family concurrent rotation conflict")
 )
 
 type replacedRefreshTokens struct {
 	AccessToken  string `json:"access"`
 	RefreshToken string `json:"refresh"`
 }
+
+// familyCurrent — payload, хранящийся под refresh_current:<family_id>
+type familyCurrent struct {
+	AccessToken  string `json:"access"`
+	RefreshToken string `json:"refresh"`
+	UserID       string `json:"user_id"`
+	CreatedAt    int64  `json:"created_at"`
+}
+
+// rotateFamilyScript — атомарная ротация family-токена.
+//
+// KEYS:
+//
+//	1: refresh_current:<family_id>
+//	2: refresh_family:<new_refresh_token>
+//	3: revoked_family:<family_id>
+//
+// ARGV:
+//
+//	1: expected old refresh token (для optimistic CAS)
+//	2: new payload JSON {access, refresh, user_id, created_at}
+//	3: new refresh token (для значения второго ключа = family_id)
+//	4: TTL (секунды)
+//	5: family_id
+//
+// Возвращает 1 при успехе, либо error_reply("REVOKED"|"NOT_FOUND"|"CONFLICT").
+var rotateFamilyScript = redis.NewScript(`
+if redis.call('EXISTS', KEYS[3]) == 1 then
+  return redis.error_reply('REVOKED')
+end
+local cur = redis.call('GET', KEYS[1])
+if not cur then
+  return redis.error_reply('NOT_FOUND')
+end
+local ok, parsed = pcall(cjson.decode, cur)
+if not ok or parsed.refresh ~= ARGV[1] then
+  return redis.error_reply('CONFLICT')
+end
+redis.call('SET', KEYS[1], ARGV[2], 'EX', ARGV[4])
+redis.call('SET', KEYS[2], ARGV[5], 'EX', ARGV[4])
+return 1
+`)
 
 // Убедимся, что repository реализует интерфейс Repository
 var _ Repository = (*repository)(nil)
@@ -61,6 +118,25 @@ type Repository interface {
 	RevokeAllUserTokens(ctx context.Context, userID string) error
 	// GetUserSessions - получение всех активных сессий пользователя
 	GetUserSessions(ctx context.Context, userID string) ([]string, error)
+
+	// === Refresh token family (OAuth 2.0 Security BCP §4.13) ===
+	// CreateFamily - создаёт новую семью refresh-токенов (Login/OAuth callback).
+	CreateFamily(ctx context.Context, familyID, userID, accessToken, refreshToken string, ttl time.Duration) error
+	// RotateFamily - атомарно ротирует пару (access, refresh) в семье.
+	// Возвращает ErrFamilyConflict если кто-то ротировал параллельно,
+	// ErrFamilyRevoked если семья была помечена скомпрометированной,
+	// ErrFamilyNotFound если семья отсутствует / истекла.
+	RotateFamily(ctx context.Context, familyID, expectedOldRefresh, newAccessToken, newRefreshToken string, ttl time.Duration) error
+	// GetFamilyCurrent - возвращает текущую активную пару семьи.
+	GetFamilyCurrent(ctx context.Context, familyID string) (access, refresh, userID string, ok bool, err error)
+	// GetFamilyByRefresh - возвращает family_id по refresh-токену (обратный индекс).
+	GetFamilyByRefresh(ctx context.Context, refreshToken string) (familyID string, ok bool, err error)
+	// RevokeFamily - отзывает всю семью (reuse detection / logout / admin action).
+	RevokeFamily(ctx context.Context, familyID string) error
+	// IsFamilyRevoked - проверяет, помечена ли семья как отозванная.
+	IsFamilyRevoked(ctx context.Context, familyID string) (bool, error)
+	// RevokeAllUserFamilies - отзывает все семьи пользователя (logout everywhere / admin).
+	RevokeAllUserFamilies(ctx context.Context, userID string) error
 
 	// === Верификация email ===
 	// StoreVerificationCode - сохранение кода верификации email (по userID)
@@ -436,5 +512,183 @@ func (r *repository) DeleteOAuthState(ctx context.Context, state string) error {
 	if err != nil {
 		return fmt.Errorf("failed to delete oauth state: %w", err)
 	}
+	return nil
+}
+
+// ==================== Refresh token family ====================
+
+// CreateFamily - создаёт новую семью refresh-токенов (Login / OAuth / register).
+// Атомарно через TxPipeline: refresh_current, refresh_family и user_families
+// обновляются одной транзакцией, чтобы не оставлять "висящих" обратных индексов.
+func (r *repository) CreateFamily(ctx context.Context, familyID, userID, accessToken, refreshToken string, ttl time.Duration) error {
+	if familyID == "" || userID == "" || refreshToken == "" {
+		return fmt.Errorf("CreateFamily: familyID, userID and refreshToken must be non-empty")
+	}
+	payload, err := json.Marshal(familyCurrent{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		UserID:       userID,
+		CreatedAt:    time.Now().Unix(),
+	})
+	if err != nil {
+		return fmt.Errorf("marshal family payload: %w", err)
+	}
+	pipe := r.client.TxPipeline()
+	pipe.Set(ctx, refreshCurrentPrefix+familyID, payload, ttl)
+	pipe.Set(ctx, refreshFamilyPrefix+refreshToken, familyID, ttl)
+	pipe.SAdd(ctx, userFamiliesPrefix+userID, familyID)
+	pipe.Expire(ctx, userFamiliesPrefix+userID, ttl)
+	if _, err := pipe.Exec(ctx); err != nil {
+		return fmt.Errorf("create family pipeline: %w", err)
+	}
+	return nil
+}
+
+// RotateFamily - атомарная ротация семьи через Lua-скрипт.
+// Гарантирует, что параллельные запросы с одним и тем же refresh-токеном
+// приведут максимум к одной реальной ротации (CAS на refresh).
+func (r *repository) RotateFamily(ctx context.Context, familyID, expectedOldRefresh, newAccessToken, newRefreshToken string, ttl time.Duration) error {
+	if familyID == "" || expectedOldRefresh == "" || newRefreshToken == "" {
+		return fmt.Errorf("RotateFamily: familyID, expectedOldRefresh, newRefreshToken must be non-empty")
+	}
+	payload, err := json.Marshal(familyCurrent{
+		AccessToken:  newAccessToken,
+		RefreshToken: newRefreshToken,
+		UserID:       "", // user_id заполняется на чтении; для CAS не используется
+		CreatedAt:    time.Now().Unix(),
+	})
+	if err != nil {
+		return fmt.Errorf("marshal family payload: %w", err)
+	}
+	// Подмешиваем user_id из текущей записи, чтобы не терять его при ротации.
+	cur, err := r.client.Get(ctx, refreshCurrentPrefix+familyID).Result()
+	if err == redis.Nil {
+		return ErrFamilyNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("read current family for rotation: %w", err)
+	}
+	var curParsed familyCurrent
+	if jerr := json.Unmarshal([]byte(cur), &curParsed); jerr != nil {
+		return fmt.Errorf("unmarshal current family payload: %w", jerr)
+	}
+	payload, err = json.Marshal(familyCurrent{
+		AccessToken:  newAccessToken,
+		RefreshToken: newRefreshToken,
+		UserID:       curParsed.UserID,
+		CreatedAt:    time.Now().Unix(),
+	})
+	if err != nil {
+		return fmt.Errorf("marshal family payload: %w", err)
+	}
+
+	ttlSec := int64(ttl.Seconds())
+	if ttlSec <= 0 {
+		ttlSec = 1
+	}
+	_, err = rotateFamilyScript.Run(ctx, r.client,
+		[]string{
+			refreshCurrentPrefix + familyID,
+			refreshFamilyPrefix + newRefreshToken,
+			revokedFamilyPrefix + familyID,
+		},
+		expectedOldRefresh,
+		string(payload),
+		newRefreshToken,
+		ttlSec,
+		familyID,
+	).Result()
+	if err != nil {
+		// Lua error_reply возвращает err.Error() с префиксом или содержимым нашего reply.
+		msg := err.Error()
+		switch {
+		case strings.Contains(msg, "REVOKED"):
+			return ErrFamilyRevoked
+		case strings.Contains(msg, "NOT_FOUND"):
+			return ErrFamilyNotFound
+		case strings.Contains(msg, "CONFLICT"):
+			return ErrFamilyConflict
+		}
+		return fmt.Errorf("rotate family lua: %w", err)
+	}
+	// Не удаляем старый refresh_family:<old>: TTL заберёт его, а пока он живёт —
+	// помогает идемпотентному lookup отставшей вкладки.
+	return nil
+}
+
+// GetFamilyCurrent - читает текущую активную пару семьи.
+func (r *repository) GetFamilyCurrent(ctx context.Context, familyID string) (string, string, string, bool, error) {
+	raw, err := r.client.Get(ctx, refreshCurrentPrefix+familyID).Result()
+	if err == redis.Nil {
+		return "", "", "", false, nil
+	}
+	if err != nil {
+		return "", "", "", false, fmt.Errorf("get family current: %w", err)
+	}
+	var p familyCurrent
+	if err := json.Unmarshal([]byte(raw), &p); err != nil {
+		return "", "", "", false, fmt.Errorf("unmarshal family current: %w", err)
+	}
+	return p.AccessToken, p.RefreshToken, p.UserID, true, nil
+}
+
+// GetFamilyByRefresh - возвращает family_id по refresh-токену (обратный индекс).
+func (r *repository) GetFamilyByRefresh(ctx context.Context, refreshToken string) (string, bool, error) {
+	v, err := r.client.Get(ctx, refreshFamilyPrefix+refreshToken).Result()
+	if err == redis.Nil {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("get family by refresh: %w", err)
+	}
+	return v, true, nil
+}
+
+// RevokeFamily - помечает семью как отозванную и удаляет активную пару.
+// Флаг revoked_family:<id> переживает удаление refresh_current — нужен для
+// reuse-detection повторных попыток с уже ротированным токеном.
+func (r *repository) RevokeFamily(ctx context.Context, familyID string) error {
+	if familyID == "" {
+		return nil
+	}
+	pipe := r.client.TxPipeline()
+	// TTL флага = TTL refresh: после истечения никаких токенов из семьи уже нет.
+	pipe.Set(ctx, revokedFamilyPrefix+familyID, "1", 0)
+	pipe.Del(ctx, refreshCurrentPrefix+familyID)
+	if _, err := pipe.Exec(ctx); err != nil {
+		return fmt.Errorf("revoke family pipeline: %w", err)
+	}
+	return nil
+}
+
+// IsFamilyRevoked - проверка флага revoked_family.
+func (r *repository) IsFamilyRevoked(ctx context.Context, familyID string) (bool, error) {
+	if familyID == "" {
+		return false, nil
+	}
+	n, err := r.client.Exists(ctx, revokedFamilyPrefix+familyID).Result()
+	if err != nil {
+		return false, fmt.Errorf("is family revoked: %w", err)
+	}
+	return n > 0, nil
+}
+
+// RevokeAllUserFamilies - отзывает все семьи пользователя.
+func (r *repository) RevokeAllUserFamilies(ctx context.Context, userID string) error {
+	if userID == "" {
+		return nil
+	}
+	families, err := r.client.SMembers(ctx, userFamiliesPrefix+userID).Result()
+	if err != nil {
+		return fmt.Errorf("get user families: %w", err)
+	}
+	for _, fid := range families {
+		if err := r.RevokeFamily(ctx, fid); err != nil {
+			// Логически не критично — продолжаем отзывать остальные.
+			continue
+		}
+	}
+	// Удаляем агрегатный SET — больше живых семей нет.
+	r.client.Del(ctx, userFamiliesPrefix+userID)
 	return nil
 }

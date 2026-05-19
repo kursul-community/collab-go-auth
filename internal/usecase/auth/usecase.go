@@ -453,6 +453,8 @@ func (uc *auth) RestorePasswordComplete(userID string, requestID string, newPass
 
 	// Отзываем все существующие токены пользователя (для безопасности)
 	uc.tokenRepo.RevokeAllUserTokens(ctx, userID)
+	// Отзываем все семьи refresh-токенов — иначе старые refresh продолжали бы работать
+	uc.tokenRepo.RevokeAllUserFamilies(ctx, userID)
 
 	log.Printf("[RequestID: %s] Password reset successfully for user: %s", requestID, userID)
 	return nil
@@ -511,8 +513,9 @@ func (uc *auth) Login(email string, password string) (string, string, error) {
 		return "", "", err
 	}
 
-	// Генерируем refresh токен
-	refreshToken, err := uc.tokenService.GenerateRefreshToken(curUser)
+	// Создаём новую семью refresh-токенов: одна семья = одна "цепочка ротаций"
+	familyID := uuid.New().String()
+	refreshToken, err := uc.tokenService.GenerateRefreshTokenForFamily(curUser, familyID)
 	if err != nil {
 		return "", "", err
 	}
@@ -523,10 +526,9 @@ func (uc *auth) Login(email string, password string) (string, string, error) {
 		return "", "", fmt.Errorf("failed to store access token: %w", err)
 	}
 
-	// Сохраняем refresh токен в Redis
-	err = uc.tokenRepo.StoreRefreshToken(ctx, curUser.ID, refreshToken, uc.refreshTTL)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to store refresh token: %w", err)
+	// Создаём семью refresh-токенов (refresh_current + refresh_family + user_families)
+	if err := uc.tokenRepo.CreateFamily(ctx, familyID, curUser.ID, accessToken, refreshToken, uc.refreshTTL); err != nil {
+		return "", "", fmt.Errorf("failed to create refresh token family: %w", err)
 	}
 
 	// Проверяем, заполнен ли профиль
@@ -548,85 +550,164 @@ func (uc *auth) Login(email string, password string) (string, string, error) {
 	return accessToken, refreshToken, nil
 }
 
-// refreshGraceTTL — окно идемпотентности для retry-refresh после потерянного
-// ответа (deploy-disconnect, multi-tab race, network blip). В пределах этого
-// TTL повторный запрос с уже-ротированным токеном получает ту же пару, что
-// была выдана первому клиенту, вместо ErrRefreshTokenNotFound + логаута.
-const refreshGraceTTL = 30 * time.Second
-
-// RefreshToken - обновление токена
+// RefreshToken - обновление токена по схеме refresh token rotation с family.
+//
+// Идемпотентность по семье: любой refresh-токен из истории семьи (даже сильно
+// отставший) возвращает текущую активную пару семьи — без TTL-grace окна.
+// Параллельные ротации атомарны через Lua-скрипт RotateFamily.
+// Reuse-detection: если refresh-токен не принадлежит активной семье — отзываем
+// всю семью и возвращаем ErrRefreshTokenNotFound (см. OAuth 2.0 Security BCP §4.13).
 func (uc *auth) RefreshToken(refreshToken string) (string, string, error) {
 	ctx := context.Background()
 
-	// Проверяем валидность JWT токена (подпись и срок действия)
+	// 1. Валидация JWT (подпись, exp)
 	isValid, err := uc.tokenService.ValidateToken(refreshToken)
 	if !isValid || err != nil {
 		return "", "", ErrInvalidRefreshToken
 	}
 
-	// Получаем userID из токена
-	userID, err := uc.tokenService.GetUserIDFromToken(refreshToken)
-	if err != nil {
+	claims, err := uc.tokenService.GetClaimsFromToken(refreshToken)
+	if err != nil || claims.UserID == "" {
 		return "", "", ErrInvalidRefreshToken
 	}
+	userID := claims.UserID
+	familyID := claims.FamilyID
 
-	// Проверяем, что refresh токен существует в Redis (не был отозван)
+	// 2. LEGACY: токен без family_id — автоматически мигрируем в новую семью
+	if familyID == "" {
+		return uc.refreshLegacyToken(ctx, userID, refreshToken)
+	}
+
+	// 3. FAMILY: проверка флага скомпрометированной семьи
+	if revoked, rerr := uc.tokenRepo.IsFamilyRevoked(ctx, familyID); rerr == nil && revoked {
+		return "", "", ErrRefreshTokenNotFound
+	}
+
+	// 4. Обратный индекс: refresh → family_id. Если индекс не находит — это
+	//    либо отставший токен, который мы тоже должны идемпотентно обработать,
+	//    либо подмена. Проверим текущую пару семьи прежде, чем решать.
+	famByToken, ok, err := uc.tokenRepo.GetFamilyByRefresh(ctx, refreshToken)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to lookup refresh family: %w", err)
+	}
+	if ok && famByToken != familyID {
+		// Подменили family_id в JWT (или коллизия). Это reuse — убиваем обе семьи.
+		_ = uc.tokenRepo.RevokeFamily(ctx, familyID)
+		_ = uc.tokenRepo.RevokeFamily(ctx, famByToken)
+		return "", "", ErrRefreshTokenNotFound
+	}
+
+	// 5. Читаем текущую активную пару семьи
+	curAccess, curRefresh, curUserID, found, err := uc.tokenRepo.GetFamilyCurrent(ctx, familyID)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get family current: %w", err)
+	}
+	if !found {
+		// Семья отсутствует — либо истекла, либо была отозвана. Не оживляем.
+		return "", "", ErrRefreshTokenNotFound
+	}
+	if curUserID != userID {
+		// Семья принадлежит другому пользователю — подмена subject в JWT.
+		_ = uc.tokenRepo.RevokeFamily(ctx, familyID)
+		return "", "", ErrRefreshTokenNotFound
+	}
+
+	// 6. Идемпотентность: отставшая вкладка с уже-ротированным токеном
+	if curRefresh != refreshToken {
+		// Если переданный refresh даже не значится в индексе семьи — это reuse
+		// мёртвого токена, который вообще никогда не выдавался этой семьёй.
+		if !ok {
+			_ = uc.tokenRepo.RevokeFamily(ctx, familyID)
+			return "", "", ErrRefreshTokenNotFound
+		}
+		// Отставший, но "законный" токен — отдаём текущую пару.
+		return curAccess, curRefresh, nil
+	}
+
+	// 7. Ротация: текущий refresh совпадает с переданным. Делаем атомарный CAS.
+	curUser, err := uc.userRepo.GetUserById(ctx, userID)
+	if err != nil || curUser == nil {
+		return "", "", ErrUserNotFound
+	}
+	newAccess, err := uc.tokenService.GenerateAccessToken(curUser)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to generate access token: %w", err)
+	}
+	newRefresh, err := uc.tokenService.GenerateRefreshTokenForFamily(curUser, familyID)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to generate refresh token: %w", err)
+	}
+
+	rotErr := uc.tokenRepo.RotateFamily(ctx, familyID, refreshToken, newAccess, newRefresh, uc.refreshTTL)
+	switch {
+	case rotErr == nil:
+		// успех — сохраняем access и возвращаем новую пару
+		if serr := uc.tokenRepo.StoreAccessToken(ctx, userID, newAccess, uc.accessTTL); serr != nil {
+			return "", "", fmt.Errorf("failed to store new access token: %w", serr)
+		}
+		return newAccess, newRefresh, nil
+	case errors.Is(rotErr, tokenrepo.ErrFamilyConflict):
+		// Параллельная ротация уже прошла — отдаём её результат идемпотентно.
+		curAccess2, curRefresh2, _, found2, gerr := uc.tokenRepo.GetFamilyCurrent(ctx, familyID)
+		if gerr != nil || !found2 {
+			return "", "", ErrRefreshTokenNotFound
+		}
+		return curAccess2, curRefresh2, nil
+	case errors.Is(rotErr, tokenrepo.ErrFamilyRevoked):
+		return "", "", ErrRefreshTokenNotFound
+	case errors.Is(rotErr, tokenrepo.ErrFamilyNotFound):
+		return "", "", ErrRefreshTokenNotFound
+	default:
+		return "", "", fmt.Errorf("failed to rotate refresh token family: %w", rotErr)
+	}
+}
+
+// refreshLegacyToken - миграция refresh-токенов без family_id (выпущенных
+// предыдущей версией) в новую family-схему при первом успешном рефреше.
+func (uc *auth) refreshLegacyToken(ctx context.Context, userID, refreshToken string) (string, string, error) {
 	exists, err := uc.tokenRepo.ValidateRefreshToken(ctx, userID, refreshToken)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to validate refresh token: %w", err)
+		return "", "", fmt.Errorf("failed to validate legacy refresh token: %w", err)
 	}
 	if !exists {
-		// Возможно, это retry потерянной ротации — пара уже выпущена и лежит
-		// в grace-окне. Идемпотентно отдаём её, чтобы не выкидывать клиента.
+		// Возможно, это retry потерянной legacy-ротации — пара уже выпущена и
+		// лежит в legacy grace-mapping. Идемпотентно отдаём её.
 		if access, refresh, ok, lookupErr := uc.tokenRepo.GetReplacedRefreshToken(ctx, refreshToken); lookupErr == nil && ok {
 			return access, refresh, nil
 		}
 		return "", "", ErrRefreshTokenNotFound
 	}
 
-	// Получаем данные пользователя для генерации новых токенов
 	curUser, err := uc.userRepo.GetUserById(ctx, userID)
 	if err != nil || curUser == nil {
 		return "", "", ErrUserNotFound
 	}
 
-	// Генерация нового access токена
-	newAccessToken, err := uc.tokenService.GenerateAccessToken(curUser)
+	familyID := uuid.New().String()
+	newAccess, err := uc.tokenService.GenerateAccessToken(curUser)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to generate access token: %w", err)
 	}
-
-	// Генерируем новый refresh токен
-	newRefreshToken, err := uc.tokenService.GenerateRefreshToken(curUser)
+	newRefresh, err := uc.tokenService.GenerateRefreshTokenForFamily(curUser, familyID)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to generate refresh token: %w", err)
 	}
 
-	// Сохраняем новый access токен в Redis
-	err = uc.tokenRepo.StoreAccessToken(ctx, userID, newAccessToken, uc.accessTTL)
-	if err != nil {
+	if err := uc.tokenRepo.CreateFamily(ctx, familyID, userID, newAccess, newRefresh, uc.refreshTTL); err != nil {
+		return "", "", fmt.Errorf("failed to create migrated family: %w", err)
+	}
+	if err := uc.tokenRepo.StoreAccessToken(ctx, userID, newAccess, uc.accessTTL); err != nil {
 		return "", "", fmt.Errorf("failed to store new access token: %w", err)
 	}
 
-	// Сохраняем новый refresh токен в Redis
-	err = uc.tokenRepo.StoreRefreshToken(ctx, userID, newRefreshToken, uc.refreshTTL)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to store new refresh token: %w", err)
-	}
-
-	// Записываем grace-mapping ДО отзыва старого: если ответ потеряется и
-	// клиент придёт снова с тем же old, он получит ту же пару идемпотентно.
-	if storeErr := uc.tokenRepo.StoreReplacedRefreshToken(ctx, refreshToken, newAccessToken, newRefreshToken, refreshGraceTTL); storeErr != nil {
-		log.Printf("RefreshToken: failed to store replaced mapping: %v", storeErr)
-	}
-
-	// Отзываем старый refresh токен
+	// Снимаем legacy refresh — его место заняла семья
 	_ = uc.tokenRepo.RevokeRefreshToken(ctx, userID, refreshToken)
 
-	return newAccessToken, newRefreshToken, nil
+	return newAccess, newRefresh, nil
 }
 
-// Logout - завершение сессии: отзывает refresh токен и связанные access токены пользователя
+// Logout - завершение сессии: отзывает refresh токен и связанные access токены пользователя.
+// Семантика "выход со всех устройств" — отзываются все семьи refresh-токенов.
 func (uc *auth) Logout(refreshToken string) error {
 	ctx := context.Background()
 
@@ -636,24 +717,42 @@ func (uc *auth) Logout(refreshToken string) error {
 		return ErrInvalidRefreshToken
 	}
 
-	// Получаем userID из токена
-	userID, err := uc.tokenService.GetUserIDFromToken(refreshToken)
-	if err != nil {
+	claims, err := uc.tokenService.GetClaimsFromToken(refreshToken)
+	if err != nil || claims.UserID == "" {
 		return ErrInvalidRefreshToken
 	}
+	userID := claims.UserID
+	familyID := claims.FamilyID
 
-	// Проверяем, что refresh токен существует в Redis (не был отозван)
-	exists, err := uc.tokenRepo.ValidateRefreshToken(ctx, userID, refreshToken)
-	if err != nil {
-		return fmt.Errorf("failed to validate refresh token: %w", err)
+	// Проверяем, что refresh-токен действительно "живой": либо легаси, либо
+	// принадлежит существующей семье. Это защищает от logout по любому случайному JWT.
+	tokenAlive := false
+	if familyID != "" {
+		if _, ok, lookupErr := uc.tokenRepo.GetFamilyByRefresh(ctx, refreshToken); lookupErr == nil && ok {
+			tokenAlive = true
+		} else if _, _, _, ok2, gerr := uc.tokenRepo.GetFamilyCurrent(ctx, familyID); gerr == nil && ok2 {
+			// Семья жива — токен из истории семьи валиден для logout
+			tokenAlive = true
+		}
 	}
-	if !exists {
-		return ErrRefreshTokenNotFound
+	if !tokenAlive {
+		// Fallback на legacy-валидацию
+		ok, lerr := uc.tokenRepo.ValidateRefreshToken(ctx, userID, refreshToken)
+		if lerr != nil {
+			return fmt.Errorf("failed to validate refresh token: %w", lerr)
+		}
+		if !ok {
+			return ErrRefreshTokenNotFound
+		}
 	}
 
 	// Отзываем все токены пользователя (access + refresh) для полного выхода
 	if err := uc.tokenRepo.RevokeAllUserTokens(ctx, userID); err != nil {
 		return fmt.Errorf("failed to revoke user tokens: %w", err)
+	}
+	// Отзываем все семьи refresh-токенов (multi-device logout)
+	if err := uc.tokenRepo.RevokeAllUserFamilies(ctx, userID); err != nil {
+		return fmt.Errorf("failed to revoke user token families: %w", err)
 	}
 
 	return nil
@@ -684,6 +783,8 @@ func (uc *auth) AdminChangePassword(userID string, newPassword string) error {
 
 	// Отзываем все токены — пользователь будет вынужден заново войти
 	uc.tokenRepo.RevokeAllUserTokens(ctx, userID)
+	// Отзываем все семьи refresh-токенов
+	uc.tokenRepo.RevokeAllUserFamilies(ctx, userID)
 
 	log.Printf("[Admin] Password changed for user: %s", userID)
 	return nil
@@ -701,6 +802,8 @@ func (uc *auth) AdminDeleteUser(userID string) error {
 
 	// Сначала отзываем все токены (Redis)
 	uc.tokenRepo.RevokeAllUserTokens(ctx, userID)
+	// Отзываем все семьи refresh-токенов
+	uc.tokenRepo.RevokeAllUserFamilies(ctx, userID)
 
 	// Очищаем Redis-ключи верификации и сброса пароля
 	uc.tokenRepo.DeleteVerificationCode(ctx, userID)

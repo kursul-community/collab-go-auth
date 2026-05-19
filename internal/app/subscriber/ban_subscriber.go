@@ -78,6 +78,10 @@ func StartBanSubscriber(ctx context.Context, redisClient *redis.Client, banCache
 				if err := tokenRepo.RevokeAllUserTokens(ctx, event.UserID); err != nil {
 					logger.Printf("Ban subscriber: failed to revoke tokens for user %s: %v", event.UserID, err)
 				}
+				// Отзываем все семьи refresh-токенов
+				if err := tokenRepo.RevokeAllUserFamilies(ctx, event.UserID); err != nil {
+					logger.Printf("Ban subscriber: failed to revoke token families for user %s: %v", event.UserID, err)
+				}
 
 				logger.Printf("Ban subscriber: user %s banned at %s — blacklisted, cache invalidated, tokens revoked", event.UserID, event.BannedAt)
 			}
