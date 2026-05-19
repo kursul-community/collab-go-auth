@@ -70,6 +70,11 @@ func (m *MockUserRepository) DeleteUser(ctx context.Context, userID string) erro
 	return args.Error(0)
 }
 
+func (m *MockUserRepository) GetSubscriptionTier(ctx context.Context, userID string) (string, error) {
+	args := m.Called(ctx, userID)
+	return args.String(0), args.Error(1)
+}
+
 // === MockUserClient (gRPC user-service) ===
 
 type MockUserClient struct {
@@ -132,6 +137,11 @@ func (m *MockTokenRepository) ValidateRefreshToken(ctx context.Context, userID s
 func (m *MockTokenRepository) RevokeRefreshToken(ctx context.Context, userID string, token string) error {
 	args := m.Called(ctx, userID, token)
 	return args.Error(0)
+}
+
+func (m *MockTokenRepository) RotateRefreshToken(ctx context.Context, userID string, token string) (bool, error) {
+	args := m.Called(ctx, userID, token)
+	return args.Bool(0), args.Error(1)
 }
 
 func (m *MockTokenRepository) StoreReplacedRefreshToken(ctx context.Context, oldToken, newAccessToken, newRefreshToken string, ttl time.Duration) error {

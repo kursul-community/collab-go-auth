@@ -26,7 +26,12 @@ import (
 	userclient "go-auth/internal/adapter/user"
 	"go-auth/internal/app/middleware"
 	oauthhttp "go-auth/internal/controller/http/oauth"
+	userrepo "go-auth/internal/repo/user"
 )
+
+// DefaultSubscriptionTier returns when DB read fails for /session-info — better
+// to serve the user as "member" than 5xx and lock them out over an infra blip.
+const DefaultSubscriptionTier = "member"
 
 // Константы для cookies
 const (
@@ -37,7 +42,7 @@ const (
 )
 
 // RunGateway - запускает HTTP Gateway сервер для REST API
-func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler, tokenSvc token.JWTToken, banCache redisadapter.BanCache, userSvcClient userclient.Client) error {
+func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler, tokenSvc token.JWTToken, banCache redisadapter.BanCache, userSvcClient userclient.Client, userRepo userrepo.Repository) error {
 	logger := log.Default()
 
 	ctx := context.Background()
@@ -355,11 +360,22 @@ func RunGateway(cfg *config.Config, oauthHandler *oauthhttp.Handler, tokenSvc to
 			}
 		}
 
+		// Subscription tier — точечный SELECT из локальной users-таблицы.
+		// При ошибке (DB временно недоступна) — fallback на "member", чтобы
+		// инфра-сбой не лочил юзера за платными фичами. Лог для on-call.
+		subscriptionTier := DefaultSubscriptionTier
+		if tier, err := userRepo.GetSubscriptionTier(r.Context(), userID); err == nil {
+			subscriptionTier = tier
+		} else {
+			logger.Printf("session-info: GetSubscriptionTier failed userID=%s err=%v (falling back to %q)", userID, err, DefaultSubscriptionTier)
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]string{
-			"status": userStatus,
-			"role":   role,
+			"status":            userStatus,
+			"role":              role,
+			"subscription_tier": subscriptionTier,
 		})
 	})
 

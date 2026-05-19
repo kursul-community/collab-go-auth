@@ -137,7 +137,7 @@ func Run(cfg *config.Config, devMode bool) {
 	}()
 
 	// Запускаем HTTP Gateway для REST API
-	if err := RunGateway(cfg, oauthHandler, tokenSvc, banCache, userSvcClient); err != nil {
+	if err := RunGateway(cfg, oauthHandler, tokenSvc, banCache, userSvcClient, userRepo); err != nil {
 		logger.Fatalf("Failed to serve HTTP Gateway: %v", err)
 	}
 }
