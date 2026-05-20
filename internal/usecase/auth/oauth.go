@@ -243,13 +243,14 @@ func (uc *oauthUseCase) HandleCallback(providerName, code, state string) (string
 		return "", "", "", false, err
 	}
 
-	// Генерируем JWT токены
+	// Генерируем JWT токены и новую семью refresh-токенов
 	accessToken, err := uc.tokenService.GenerateAccessToken(user)
 	if err != nil {
 		return "", "", "", false, err
 	}
 
-	refreshToken, err := uc.tokenService.GenerateRefreshToken(user)
+	familyID := uuid.New().String()
+	refreshToken, err := uc.tokenService.GenerateRefreshTokenForFamily(user, familyID)
 	if err != nil {
 		return "", "", "", false, err
 	}
@@ -261,14 +262,13 @@ func (uc *oauthUseCase) HandleCallback(providerName, code, state string) (string
 		}
 	}
 
-	// Сохраняем токены в Redis
+	// Сохраняем access-токен и создаём семью refresh-токенов
 	err = uc.tokenRepo.StoreAccessToken(ctx, user.ID, accessToken, uc.accessTTL)
 	if err != nil {
 		return "", "", "", false, err
 	}
 
-	err = uc.tokenRepo.StoreRefreshToken(ctx, user.ID, refreshToken, uc.refreshTTL)
-	if err != nil {
+	if err := uc.tokenRepo.CreateFamily(ctx, familyID, user.ID, accessToken, refreshToken, uc.refreshTTL); err != nil {
 		return "", "", "", false, err
 	}
 
