@@ -51,7 +51,7 @@ func Run(cfg *config.Config, devMode bool) {
 
 	// Создаем репозитории
 	userRepo := user.NewRepository(dbpool)
-	tokenRepo := tokenrepo.NewRepository(redisClient)
+	tokenRepo := tokenrepo.NewRepository(redisClient, cfg.Token.RefreshTTL)
 
 	// Создаем сервис работы с токенами
 	tokenSvc, err := token.New(cfg.Token.Secret, cfg.Token.AccessTTL, cfg.Token.RefreshTTL)

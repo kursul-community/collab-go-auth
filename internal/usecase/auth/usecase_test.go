@@ -192,7 +192,7 @@ func newRealStack(t *testing.T) *realStack {
 	cli := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	t.Cleanup(func() { _ = cli.Close() })
 
-	repo := tokenrepo.NewRepository(cli)
+	repo := tokenrepo.NewRepository(cli, testRefreshTTL)
 	svc, err := tokenadapter.New("test-secret-family", testAccessTTL, testRefreshTTL)
 	require.NoError(t, err)
 
@@ -396,33 +396,93 @@ func TestRefreshToken_InvalidJWT_Unauthenticated(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalidRefreshToken)
 }
 
-func TestLogout_RevokesAllFamilies(t *testing.T) {
+func TestLogout_RevokesOnlyCurrentFamily(t *testing.T) {
 	s := newRealStack(t)
 
 	user := &entity.User{ID: "u-logout", Email: "lo@e.com", IsActive: true, EmailVerified: true}
 	userRepo := new(MockUserRepository)
-	// Не зовётся напрямую в этом тесте, но allowed
 	userRepo.On("GetUserById", mock.Anything, user.ID).Return(user, nil).Maybe()
 	uc, _, _ := s.ucWithReal(userRepo)
 
-	// Два логина = две семьи
+	// Два логина = две семьи (два устройства)
 	fam1, _, R1 := issueFamily(t, s, user)
 	fam2, _, R2 := issueFamily(t, s, user)
 
-	// Logout по R1 — должен отозвать ВСЕ семьи пользователя
+	// Logout по R1 — должен отозвать ТОЛЬКО семью R1, не трогая R2.
 	require.NoError(t, uc.Logout(R1))
 
 	rev1, _ := s.tokenRepo.IsFamilyRevoked(context.Background(), fam1)
 	rev2, _ := s.tokenRepo.IsFamilyRevoked(context.Background(), fam2)
-	require.True(t, rev1, "family 1 must be revoked")
-	require.True(t, rev2, "family 2 must be revoked after multi-device logout")
+	require.True(t, rev1, "family of the logged-out device must be revoked")
+	require.False(t, rev2, "other device's family must stay alive (no logout-everywhere)")
 
-	// Refresh с любым старым токеном должен теперь падать
+	// Refresh залогаученного устройства падает...
 	_, _, err := uc.RefreshToken(R1)
 	require.ErrorIs(t, err, ErrRefreshTokenNotFound)
-	_, _, err = uc.RefreshToken(R2)
-	require.ErrorIs(t, err, ErrRefreshTokenNotFound)
+	// ...а второе устройство продолжает работать.
+	a, r, err := uc.RefreshToken(R2)
+	require.NoError(t, err, "second device must keep its session after logout on the first")
+	require.NotEmpty(t, a)
+	require.NotEmpty(t, r)
 }
+
+// RC-2 regression: легитимный «старый» токен, чей обратный индекс refresh_family
+// уже истёк (или удалён), но семья жива, должен идемпотентно вернуть текущую пару
+// и НЕ убивать семью. Раньше step 6 `if !ok` вызывал RevokeFamily → 401 на всех
+// устройствах.
+func TestRefreshToken_StaleTokenMissingReverseIndex_ReturnsCurrentNoRevoke(t *testing.T) {
+	s := newRealStack(t)
+	userRepo := new(MockUserRepository)
+	user := &entity.User{ID: "u-noidx", Email: "n@e.com", IsActive: true, EmailVerified: true}
+	userRepo.On("GetUserById", mock.Anything, user.ID).Return(user, nil)
+	uc, _, _ := s.ucWithReal(userRepo)
+
+	familyID, _, R0 := issueFamily(t, s, user)
+
+	// Ротация R0 → R1: семья жива, текущий refresh = R1.
+	_, R1, err := uc.RefreshToken(R0)
+	require.NoError(t, err)
+	require.NotEmpty(t, R1)
+
+	// Симулируем истёкший обратный индекс R0 (его TTL не продлевается при ротации).
+	require.NoError(t, s.client.Del(context.Background(), testRefreshFamilyPrefix+R0).Err())
+
+	// Старый R0 приходит снова: обратного индекса нет (!ok), но семья жива.
+	gotA, gotR, err := uc.RefreshToken(R0)
+	require.NoError(t, err, "stale token without reverse index must NOT 401")
+	require.NotEmpty(t, gotA)
+	require.Equal(t, R1, gotR, "must return CURRENT refresh idempotently")
+
+	// Семья НЕ должна быть отозвана.
+	revoked, _ := s.tokenRepo.IsFamilyRevoked(context.Background(), familyID)
+	require.False(t, revoked, "legit stale token must not revoke the family")
+
+	// Семья всё ещё активна — текущий refresh на месте.
+	_, curR, _, ok, err := s.tokenRepo.GetFamilyCurrent(context.Background(), familyID)
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.Equal(t, R1, curR)
+}
+
+// RC-4 regression: tombstone revoked_family должен иметь ограниченный TTL,
+// а не жить вечно (Set(..., 0) приводил к бесконечному накоплению ключей).
+func TestRevokeFamily_TombstoneHasBoundedTTL(t *testing.T) {
+	s := newRealStack(t)
+	user := &entity.User{ID: "u-ttl", Email: "ttl@e.com", IsActive: true, EmailVerified: true}
+	familyID, _, _ := issueFamily(t, s, user)
+
+	require.NoError(t, s.tokenRepo.RevokeFamily(context.Background(), familyID))
+
+	ttl := s.client.TTL(context.Background(), testRevokedFamilyPrefix+familyID).Val()
+	require.Greater(t, ttl, time.Duration(0), "revoked_family tombstone must have a positive TTL")
+	require.LessOrEqual(t, ttl, testRefreshTTL, "tombstone TTL must not exceed refresh TTL")
+}
+
+// Локальные копии Redis-префиксов пакета token (в пакете они не экспортированы).
+const (
+	testRefreshFamilyPrefix = "refresh_family:"
+	testRevokedFamilyPrefix = "revoked_family:"
+)
 
 func TestRefreshToken_TamperedFamilyID_ReuseDetected(t *testing.T) {
 	s := newRealStack(t)
