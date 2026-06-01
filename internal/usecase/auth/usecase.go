@@ -612,15 +612,15 @@ func (uc *auth) RefreshToken(refreshToken string) (string, string, error) {
 		return "", "", ErrRefreshTokenNotFound
 	}
 
-	// 6. Идемпотентность: отставшая вкладка с уже-ротированным токеном
+	// 6. Идемпотентность: отставшая вкладка / второе устройство с уже-ротированным
+	//    токеном. Подпись JWT уже проверена (шаг 1, HS256-секрет — подделать
+	//    нельзя), а family_id и user совпадают с живой семьёй (шаги 4-5). Значит
+	//    токен действительно выдан нами для этой семьи — даже если его обратный
+	//    индекс refresh_family уже истёк по собственному TTL. Это НЕ reuse: отдаём
+	//    текущую пару идемпотентно, а НЕ убиваем всю семью. Прежний `if !ok` →
+	//    RevokeFamily ложно срабатывал на легитимных «старых» токенах и выкидывал
+	//    пользователя со всех устройств (401 "refresh token not found in storage").
 	if curRefresh != refreshToken {
-		// Если переданный refresh даже не значится в индексе семьи — это reuse
-		// мёртвого токена, который вообще никогда не выдавался этой семьёй.
-		if !ok {
-			_ = uc.tokenRepo.RevokeFamily(ctx, familyID)
-			return "", "", ErrRefreshTokenNotFound
-		}
-		// Отставший, но "законный" токен — отдаём текущую пару.
 		return curAccess, curRefresh, nil
 	}
 
@@ -706,8 +706,10 @@ func (uc *auth) refreshLegacyToken(ctx context.Context, userID, refreshToken str
 	return newAccess, newRefresh, nil
 }
 
-// Logout - завершение сессии: отзывает refresh токен и связанные access токены пользователя.
-// Семантика "выход со всех устройств" — отзываются все семьи refresh-токенов.
+// Logout - завершение текущей сессии: отзывает ТОЛЬКО семью предъявленного
+// refresh-токена (выход с одного устройства). Остальные сессии пользователя
+// не затрагиваются. Полный выход со всех устройств — отдельные flow
+// (смена пароля, бан) через RevokeAllUserFamilies.
 func (uc *auth) Logout(refreshToken string) error {
 	ctx := context.Background()
 
@@ -746,15 +748,27 @@ func (uc *auth) Logout(refreshToken string) error {
 		}
 	}
 
-	// Отзываем все токены пользователя (access + refresh) для полного выхода
-	if err := uc.tokenRepo.RevokeAllUserTokens(ctx, userID); err != nil {
-		return fmt.Errorf("failed to revoke user tokens: %w", err)
-	}
-	// Отзываем все семьи refresh-токенов (multi-device logout)
-	if err := uc.tokenRepo.RevokeAllUserFamilies(ctx, userID); err != nil {
-		return fmt.Errorf("failed to revoke user token families: %w", err)
+	// Logout одного устройства: отзываем ТОЛЬКО семью предъявленного refresh-токена.
+	// Раньше здесь вызывались RevokeAllUserTokens + RevokeAllUserFamilies, из-за
+	// чего выход на одном устройстве выкидывал пользователя со ВСЕХ остальных
+	// (соседние сессии получали 401 "refresh token not found in storage").
+	// Полный выход со всех устройств выполняется отдельными flow (смена пароля,
+	// бан) через RevokeAllUserFamilies — их поведение не меняется.
+	if familyID != "" {
+		// Сбрасываем текущий access-токен семьи, если он ещё активен.
+		if access, _, _, ok, gerr := uc.tokenRepo.GetFamilyCurrent(ctx, familyID); gerr == nil && ok && access != "" {
+			_ = uc.tokenRepo.RevokeAccessToken(ctx, userID, access)
+		}
+		if err := uc.tokenRepo.RevokeFamily(ctx, familyID); err != nil {
+			return fmt.Errorf("failed to revoke token family: %w", err)
+		}
+		return nil
 	}
 
+	// Legacy-токен без family_id — отзываем только его.
+	if err := uc.tokenRepo.RevokeRefreshToken(ctx, userID, refreshToken); err != nil {
+		return fmt.Errorf("failed to revoke refresh token: %w", err)
+	}
 	return nil
 }
 

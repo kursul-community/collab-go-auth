@@ -181,11 +181,19 @@ type Repository interface {
 // repository - структура репозитория для работы с Redis
 type repository struct {
 	client *redis.Client
+	// refreshTTL — время жизни refresh-токена. Используется как TTL для
+	// tombstone-флага revoked_family: флаг должен жить не дольше, чем самый
+	// долгоживущий refresh-токен семьи, иначе ключи копятся в Redis навсегда.
+	refreshTTL time.Duration
 }
 
-// NewRepository - конструктор для repository
-func NewRepository(client *redis.Client) Repository {
-	return &repository{client: client}
+// defaultRevokedFamilyTTL — запасной TTL для tombstone, если refreshTTL не задан.
+const defaultRevokedFamilyTTL = 720 * time.Hour
+
+// NewRepository - конструктор для repository.
+// refreshTTL задаёт TTL tombstone-флагов отозванных семей (revoked_family).
+func NewRepository(client *redis.Client, refreshTTL time.Duration) Repository {
+	return &repository{client: client, refreshTTL: refreshTTL}
 }
 
 // ==================== Access токены ====================
@@ -649,6 +657,14 @@ func (r *repository) RotateFamily(ctx context.Context, familyID, expectedOldRefr
 		}
 		return fmt.Errorf("rotate family lua: %w", err)
 	}
+	// Продлеваем TTL агрегатного набора семей пользователя на каждый рефреш.
+	// refresh_current и новый refresh_family уже получают полный TTL в Lua-скрипте
+	// (sliding window), а user_families выставлялся только при CreateFamily —
+	// без этого набор истекал бы у долгоживущих активных сессий и ломал бы
+	// корректный revoke-all.
+	if curParsed.UserID != "" {
+		r.client.Expire(ctx, userFamiliesPrefix+curParsed.UserID, ttl)
+	}
 	// Не удаляем старый refresh_family:<old>: TTL заберёт его, а пока он живёт —
 	// помогает идемпотентному lookup отставшей вкладки.
 	return nil
@@ -689,9 +705,15 @@ func (r *repository) RevokeFamily(ctx context.Context, familyID string) error {
 	if familyID == "" {
 		return nil
 	}
+	// TTL флага = TTL refresh: после истечения никаких токенов из семьи уже нет,
+	// поэтому tombstone можно удалять. 0 (без TTL) приводил бы к бесконечному
+	// накоплению ключей revoked_family в Redis.
+	tombstoneTTL := r.refreshTTL
+	if tombstoneTTL <= 0 {
+		tombstoneTTL = defaultRevokedFamilyTTL
+	}
 	pipe := r.client.TxPipeline()
-	// TTL флага = TTL refresh: после истечения никаких токенов из семьи уже нет.
-	pipe.Set(ctx, revokedFamilyPrefix+familyID, "1", 0)
+	pipe.Set(ctx, revokedFamilyPrefix+familyID, "1", tombstoneTTL)
 	pipe.Del(ctx, refreshCurrentPrefix+familyID)
 	if _, err := pipe.Exec(ctx); err != nil {
 		return fmt.Errorf("revoke family pipeline: %w", err)
