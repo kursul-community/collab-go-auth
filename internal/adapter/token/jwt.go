@@ -18,16 +18,18 @@ var (
 	ErrRefreshTokenExpired = errors.New("refresh token expired")
 )
 
-// customClaims — JWT claims с ролью пользователя
+// customClaims — JWT claims с ролью пользователя и family_id (для refresh token rotation)
 type customClaims struct {
 	jwt.RegisteredClaims
-	Role string `json:"role,omitempty"`
+	Role     string `json:"role,omitempty"`
+	FamilyID string `json:"fid,omitempty"`
 }
 
 // TokenClaims содержит извлеченные из JWT данные
 type TokenClaims struct {
 	UserID   string
 	Role     string
+	FamilyID string
 	IssuedAt time.Time
 }
 
@@ -35,15 +37,17 @@ type TokenClaims struct {
 type JWTToken interface {
 	// GenerateAccessToken - генерация access токена
 	GenerateAccessToken(user *entity.User) (string, error)
-	// GenerateRefreshToken - генерация refresh токена
+	// GenerateRefreshToken - генерация refresh токена (без family_id, для legacy совместимости)
 	GenerateRefreshToken(user *entity.User) (string, error)
+	// GenerateRefreshTokenForFamily - генерация refresh токена с привязкой к семье ротации
+	GenerateRefreshTokenForFamily(user *entity.User, familyID string) (string, error)
 	// ValidateToken - валидация токена
 	ValidateToken(token string) (bool, error)
 	// RefreshAccessToken - обновление access токена
 	RefreshAccessToken(refreshToken string) (string, error)
 	// GetUserIDFromToken - извлечение userID из токена
 	GetUserIDFromToken(token string) (string, error)
-	// GetClaimsFromToken - извлечение claims (userID + role + issuedAt) из токена
+	// GetClaimsFromToken - извлечение claims (userID + role + family_id + issuedAt) из токена
 	GetClaimsFromToken(token string) (*TokenClaims, error)
 }
 
@@ -68,12 +72,20 @@ func New(secret string, accessTTL, refreshTTL time.Duration) (JWTToken, error) {
 
 // GenerateAccessToken - генерация access токена
 func (s *jwtToken) GenerateAccessToken(user *entity.User) (string, error) {
-	return s.generateToken(user.ID, user.Role, s.accessTTL)
+	return s.generateToken(user.ID, user.Role, "", s.accessTTL)
 }
 
-// GenerateRefreshToken - генерация refresh токена
+// GenerateRefreshToken - генерация refresh токена (без family_id — legacy/compat).
+// Новая логика в usecase передаёт family_id через GenerateRefreshTokenForFamily.
 func (s *jwtToken) GenerateRefreshToken(user *entity.User) (string, error) {
-	return s.generateToken(user.ID, user.Role, s.refreshTTL)
+	return s.generateToken(user.ID, user.Role, "", s.refreshTTL)
+}
+
+// GenerateRefreshTokenForFamily - генерация refresh токена с привязкой к семье.
+// Подпись содержит family_id, что позволяет на стороне сервера сопоставлять
+// refresh-токен с активной семьёй и обнаруживать reuse "мёртвых" токенов.
+func (s *jwtToken) GenerateRefreshTokenForFamily(user *entity.User, familyID string) (string, error) {
+	return s.generateToken(user.ID, user.Role, familyID, s.refreshTTL)
 }
 
 // ValidateToken - валидация токена
@@ -108,11 +120,12 @@ func (s *jwtToken) RefreshAccessToken(refreshToken string) (string, error) {
 	if role == "" {
 		role = "user"
 	}
-	return s.generateToken(claims.Subject, role, s.accessTTL)
+	// При обновлении access-токена сохраняем привязку к family_id, если она есть
+	return s.generateToken(claims.Subject, role, claims.FamilyID, s.accessTTL)
 }
 
 // generateToken - вспомогательный метод для генерации токена
-func (s *jwtToken) generateToken(userID string, role string, ttl time.Duration) (string, error) {
+func (s *jwtToken) generateToken(userID string, role string, familyID string, ttl time.Duration) (string, error) {
 	if role == "" {
 		role = "user"
 	}
@@ -124,7 +137,8 @@ func (s *jwtToken) generateToken(userID string, role string, ttl time.Duration) 
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
 		},
-		Role: role,
+		Role:     role,
+		FamilyID: familyID,
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(s.secret))
@@ -152,8 +166,9 @@ func (s *jwtToken) GetClaimsFromToken(tokenStr string) (*TokenClaims, error) {
 	}
 
 	tc := &TokenClaims{
-		UserID: claims.Subject,
-		Role:   role,
+		UserID:   claims.Subject,
+		Role:     role,
+		FamilyID: claims.FamilyID,
 	}
 	if claims.IssuedAt != nil {
 		tc.IssuedAt = claims.IssuedAt.Time
